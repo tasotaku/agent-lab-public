@@ -35,7 +35,7 @@ FORBIDDEN_ROOTS = {
 
 
 def run(*command: str) -> subprocess.CompletedProcess[str]:
-    # AI_NOTE: Validators execute only public, repository-owned entry points and
+    # Validators execute only public, repository-owned entry points and
     # retain their output so a failing contract remains directly diagnosable.
     return subprocess.run(
         command,
@@ -48,7 +48,7 @@ def run(*command: str) -> subprocess.CompletedProcess[str]:
 
 
 def main() -> int:
-    # AI_NOTE: Structural failures are reported before executable checks so an
+    # Structural failures are reported before executable checks so an
     # empty or privacy-stripped shell cannot pass by merely exiting successfully.
     failures: list[str] = []
     missing = sorted(path for path in REQUIRED if not (ROOT / path).exists())
