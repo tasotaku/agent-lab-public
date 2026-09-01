@@ -17,11 +17,12 @@ API = "https://api.github.com/repos/tasotaku/agent-lab-public"
 REQUIRED_OS = {"windows-latest", "macos-latest", "ubuntu-latest"}
 REQUIRED_STEPS = {
     "Install into isolated home",
-    "Check isolated installation",
+    "Verify generic rule, shared skills, tooling, Claude Code target, and Codex target",
     "Load installed capability",
     "Audit public payload and history",
     "Run unit and distribution tests",
 }
+COMPONENTS = "generic-rule,shared-skills,tooling,claude-code-target,codex-target"
 
 
 def get_json(url: str) -> dict[str, Any]:
@@ -73,6 +74,7 @@ def evaluate(commit: str, runs: dict[str, Any], jobs: dict[str, Any]) -> tuple[l
                 "os": os_name,
                 "conclusion": str(job.get("conclusion")),
                 "components": "PASS" if not missing else "FAIL",
+                "component_names": COMPONENTS,
                 "url": str(job.get("html_url", "")),
             }
         )
@@ -102,7 +104,10 @@ def main() -> int:
     print("AUTHENTICATION: none")
     print("WORKFLOW PERMISSIONS: contents read-only")
     for item in evidence:
-        print(f"{item['components']}: {item['job']} conclusion={item['conclusion']} url={item['url']}")
+        print(
+            f"{item['components']}: {item['job']} conclusion={item['conclusion']} "
+            f"components={item['component_names']} url={item['url']}"
+        )
     for failure in failures:
         print(f"FAIL: {failure}")
     if failures:

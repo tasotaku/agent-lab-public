@@ -22,6 +22,7 @@ Set-Location agent-lab-public
 python bootstrap.py --home "$PWD\sandbox-home" install
 python bootstrap.py --home "$PWD\sandbox-home" check
 python bootstrap.py --home "$PWD\sandbox-home" smoke
+python bootstrap.py --home "$PWD\sandbox-home" targets --format json
 ```
 
 ### macOS / Linux
@@ -32,6 +33,7 @@ cd agent-lab-public
 python3 bootstrap.py --home ./sandbox-home install
 python3 bootstrap.py --home ./sandbox-home check
 python3 bootstrap.py --home ./sandbox-home smoke
+python3 bootstrap.py --home ./sandbox-home targets --format json
 ```
 
 隔離試用がPASSしたら、通常profileへ本導入します。

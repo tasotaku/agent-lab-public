@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import json
 from pathlib import Path
 import shutil
 import sys
@@ -15,6 +16,11 @@ ROOT = Path(__file__).resolve().parent
 SHARED_SKILLS = ROOT / "skills/shared"
 CODEX_SKILLS = ROOT / "skills/codex"
 RULE = ROOT / "rules/core.md"
+TOOL_SOURCES = {
+    "bootstrap.py": ROOT / "bootstrap.py",
+    "audit_public.py": ROOT / "tools/audit_public.py",
+    "compatibility.py": ROOT / "tools/compatibility.py",
+}
 START = "<!-- agent-lab-public:start -->"
 END = "<!-- agent-lab-public:end -->"
 
@@ -36,16 +42,20 @@ def tree_hash(path: Path) -> str:
     return digest.hexdigest()
 
 
-def managed_block() -> str:
+def installed_rule(home: Path) -> Path:
+    return home / ".agent-lab-public/rules/core.md"
+
+
+def managed_block(home: Path) -> str:
     # Both agents receive the same portable rule through an absolute
     # import resolved from the user's public clone, not a baked-in machine path.
-    return f"{START}\n@{RULE.as_posix()}\n{END}"
+    return f"{START}\n@{installed_rule(home).as_posix()}\n{END}"
 
 
-def merged_index(existing: str) -> str:
+def merged_index(existing: str, home: Path) -> str:
     # Only the marked block is managed; unknown user instructions stay
     # byte-for-byte outside it and remain recoverable through the backup too.
-    block = managed_block()
+    block = managed_block(home)
     if START not in existing and END not in existing:
         prefix = existing.rstrip()
         return f"{prefix}\n\n{block}\n" if prefix else f"{block}\n"
@@ -74,7 +84,7 @@ def install_index(path: Path, home: Path, backup_root: Path) -> str:
     # Index updates converge on one managed import while preserving all
     # user-owned text around it, so repeated installs do not create churn.
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
-    desired = merged_index(existing)
+    desired = merged_index(existing, home)
     if existing == desired:
         return "REUSED"
     backup(path, home, backup_root)
@@ -96,6 +106,15 @@ def install_skill(source: Path, destination: Path, home: Path, backup_root: Path
     return "INSTALLED"
 
 
+def install_file(source: Path, destination: Path, home: Path, backup_root: Path) -> str:
+    if tree_hash(source) == tree_hash(destination):
+        return "REUSED"
+    backup(destination, home, backup_root)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return "INSTALLED"
+
+
 def source_skills() -> tuple[dict[str, Path], dict[str, Path]]:
     # Codex starts with shared skills then applies explicit overrides;
     # Claude receives only provider-neutral shared procedures.
@@ -105,6 +124,27 @@ def source_skills() -> tuple[dict[str, Path], dict[str, Path]]:
     return shared, codex
 
 
+def target_inventory() -> dict[str, object]:
+    shared, codex = source_skills()
+    targets = [
+        {"category": "rules", "owner": "shared", "root": "home", "path": ".agent-lab-public/rules/core.md"},
+        {"category": "tooling", "owner": "shared", "root": "home", "path": ".agent-lab-public/tools/bootstrap.py"},
+        {"category": "tooling", "owner": "shared", "root": "home", "path": ".agent-lab-public/tools/audit_public.py"},
+        {"category": "tooling", "owner": "shared", "root": "home", "path": ".agent-lab-public/tools/compatibility.py"},
+        {"category": "rules", "owner": "claude-code", "root": "home", "path": ".claude/CLAUDE.md"},
+        {"category": "rules", "owner": "codex", "root": "home", "path": ".codex/AGENTS.md"},
+    ]
+    targets.extend(
+        {"category": "skills", "owner": "claude-code", "root": "home", "path": f".claude/skills/{name}"}
+        for name in sorted(shared)
+    )
+    targets.extend(
+        {"category": "skills", "owner": "codex", "root": "home", "path": f".agents/skills/{name}"}
+        for name in sorted(codex)
+    )
+    return {"schema": "agent-lab-public-targets-v1", "configuration_root": "home", "targets": targets}
+
+
 def install(home: Path) -> int:
     # One timestamp groups all backups from a single transaction and is
     # created lazily only if a pre-existing asset is actually replaced.
@@ -112,6 +152,11 @@ def install(home: Path) -> int:
     backup_root = home / ".agent-lab-public/backups" / stamp
     shared, codex = source_skills()
     results = [
+        ("generic rule", install_file(RULE, installed_rule(home), home, backup_root)),
+        *(
+            (f"tooling {name}", install_file(source, home / ".agent-lab-public/tools" / name, home, backup_root))
+            for name, source in TOOL_SOURCES.items()
+        ),
         ("Claude Code rules", install_index(home / ".claude/CLAUDE.md", home, backup_root)),
         ("Codex rules", install_index(home / ".codex/AGENTS.md", home, backup_root)),
     ]
@@ -126,10 +171,10 @@ def install(home: Path) -> int:
     return 0
 
 
-def check_index(path: Path) -> bool:
+def check_index(path: Path, home: Path) -> bool:
     # Verification requires the exact current managed block, not merely
     # the existence of an agent index that could still reference an old clone.
-    return path.is_file() and managed_block() in path.read_text(encoding="utf-8")
+    return path.is_file() and managed_block(home) in path.read_text(encoding="utf-8")
 
 
 def check(home: Path) -> int:
@@ -137,8 +182,13 @@ def check(home: Path) -> int:
     # partial installation cannot be mistaken for a generic success message.
     shared, codex = source_skills()
     checks = [
-        ("Claude Code rules", check_index(home / ".claude/CLAUDE.md")),
-        ("Codex rules", check_index(home / ".codex/AGENTS.md")),
+        ("generic rules", tree_hash(RULE) == tree_hash(installed_rule(home))),
+        (
+            "reusable tooling (bootstrap, public audit, compatibility)",
+            all(tree_hash(source) == tree_hash(home / ".agent-lab-public/tools" / name) for name, source in TOOL_SOURCES.items()),
+        ),
+        ("Claude Code rules", check_index(home / ".claude/CLAUDE.md", home)),
+        ("Codex rules", check_index(home / ".codex/AGENTS.md", home)),
         (
             f"Claude skills ({len(shared)})",
             all(tree_hash(source) == tree_hash(home / ".claude/skills" / name) for name, source in shared.items()),
@@ -147,7 +197,6 @@ def check(home: Path) -> int:
             f"Codex skills ({len(codex)})",
             all(tree_hash(source) == tree_hash(home / ".agents/skills" / name) for name, source in codex.items()),
         ),
-        ("reusable tooling (bootstrap and public audit)", (ROOT / "tools/audit_public.py").is_file()),
     ]
     for label, passed in checks:
         print(f"{'PASS' if passed else 'FAIL'}: {label}")
@@ -196,13 +245,17 @@ def parse_args() -> argparse.Namespace:
     # normal users need only the three short README commands.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--home", type=Path, default=Path.home())
-    parser.add_argument("command", choices=["install", "check", "smoke"])
+    parser.add_argument("command", choices=["install", "check", "smoke", "targets"])
+    parser.add_argument("--format", choices=["json"], default="json")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     home = args.home.expanduser().resolve()
+    if args.command == "targets":
+        print(json.dumps(target_inventory(), indent=2, sort_keys=True))
+        return 0
     if args.command == "install":
         return install(home)
     if args.command == "check":

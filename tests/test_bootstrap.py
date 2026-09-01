@@ -7,9 +7,34 @@ import tempfile
 import unittest
 
 import bootstrap
+from tools import compatibility
 
 
 class BootstrapTest(unittest.TestCase):
+    def test_compatibility_evidence_names_every_verified_component(self) -> None:
+        commit = "a" * 40
+        runs = {
+            "workflow_runs": [
+                {"head_sha": commit, "name": "Cross-platform install", "conclusion": "success"}
+            ]
+        }
+        steps = [{"name": name, "conclusion": "success"} for name in compatibility.REQUIRED_STEPS]
+        jobs = {
+            "jobs": [
+                {
+                    "name": f"install-check ({os_name}, 3.13, python3)",
+                    "conclusion": "success",
+                    "html_url": "https://example.invalid/job",
+                    "steps": steps,
+                }
+                for os_name in sorted(compatibility.REQUIRED_OS)
+            ]
+        }
+        evidence, failures = compatibility.evaluate(commit, runs, jobs)
+        self.assertEqual(failures, [])
+        self.assertEqual(len(evidence), 3)
+        self.assertTrue(all(item["component_names"] == compatibility.COMPONENTS for item in evidence))
+
     def test_clean_install_check_and_smoke(self) -> None:
         # A disposable home proves the complete public journey without
         # reading or mutating the signed-in machine's normal agent profiles.
@@ -18,8 +43,13 @@ class BootstrapTest(unittest.TestCase):
             self.assertEqual(bootstrap.install(home), 0)
             self.assertEqual(bootstrap.check(home), 0)
             self.assertEqual(bootstrap.smoke(home), 0)
-            self.assertIn(bootstrap.managed_block(), (home / ".claude/CLAUDE.md").read_text(encoding="utf-8"))
-            self.assertIn(bootstrap.managed_block(), (home / ".codex/AGENTS.md").read_text(encoding="utf-8"))
+            self.assertIn(bootstrap.managed_block(home), (home / ".claude/CLAUDE.md").read_text(encoding="utf-8"))
+            self.assertIn(bootstrap.managed_block(home), (home / ".codex/AGENTS.md").read_text(encoding="utf-8"))
+            self.assertEqual(bootstrap.tree_hash(bootstrap.RULE), bootstrap.tree_hash(bootstrap.installed_rule(home)))
+            self.assertEqual(
+                sorted(item["category"] for item in bootstrap.target_inventory()["targets"]),
+                sorted(["rules"] * 3 + ["tooling"] * 3 + ["skills"] * 17),
+            )
             self.assertTrue((home / ".claude/skills/test/SKILL.md").is_file())
             self.assertTrue((home / ".agents/skills/make-portable/SKILL.md").is_file())
 
