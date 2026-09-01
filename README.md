@@ -38,9 +38,16 @@ capability名とパスを表示します。失敗時は不足項目と次に再�
 
 ## 対応状況
 
-Windows、macOS、Linuxを同じcommitの公開CIで検査します。上のバッジからmatrixを開くと、
-各OSのinstall、check、smoke、privacy audit、unit testを確認できます。CIは資格情報を使わず、
-隔離したhomeへだけ導入します。
+Windows、macOS、Linuxを同じcommitの公開CIで検査します。上のバッジからmatrixを開けます。
+GitHubのraw log画面が未ログイン利用者へsign-inを求める場合も、次の公開Jobs API検査なら認証なしで
+同じcommitの各OS・各stepの成否を確認できます。
+
+```bash
+python tools/compatibility.py
+```
+
+CIは資格情報を使わず、read-only checkoutから隔離homeへ導入します。WindowsではREADMEと同じ
+`python`、macOS/Linuxでは同じ `python3` コマンドでinstall、check、smoke、privacy audit、unit testを実行します。
 
 ## 公開内容を自分で監査する
 
@@ -93,4 +100,3 @@ python bootstrap.py --home ./sandbox-home smoke
 ## License
 
 [MIT](LICENSE)
-

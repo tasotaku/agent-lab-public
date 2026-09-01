@@ -13,8 +13,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        python: ["3.9", "3.13"]
+        include:
+          - os: windows-latest
+            python: "3.9"
+            executable: python
+          - os: windows-latest
+            python: "3.13"
+            executable: python
+          - os: macos-latest
+            python: "3.9"
+            executable: python3
+          - os: macos-latest
+            python: "3.13"
+            executable: python3
+          - os: ubuntu-latest
+            python: "3.9"
+            executable: python3
+          - os: ubuntu-latest
+            python: "3.13"
+            executable: python3
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -24,12 +41,12 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install into isolated home
-        run: python bootstrap.py --home "${{ runner.temp }}/agent-lab-home" install
+        run: ${{ matrix.executable }} bootstrap.py --home "${{ runner.temp }}/agent-lab-home" install
       - name: Check isolated installation
-        run: python bootstrap.py --home "${{ runner.temp }}/agent-lab-home" check
+        run: ${{ matrix.executable }} bootstrap.py --home "${{ runner.temp }}/agent-lab-home" check
       - name: Load installed capability
-        run: python bootstrap.py --home "${{ runner.temp }}/agent-lab-home" smoke
+        run: ${{ matrix.executable }} bootstrap.py --home "${{ runner.temp }}/agent-lab-home" smoke
       - name: Audit public payload and history
-        run: python tools/audit_public.py
+        run: ${{ matrix.executable }} tools/audit_public.py
       - name: Run unit and distribution tests
-        run: python tests/validate_distribution.py
+        run: ${{ matrix.executable }} tests/validate_distribution.py

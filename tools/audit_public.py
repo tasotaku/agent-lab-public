@@ -14,6 +14,7 @@ from typing import Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SCANNER_VERSION = "1.1.0"
 CATEGORIES = (
     "credentials",
     "personal_config",
@@ -165,6 +166,78 @@ def refs() -> list[str]:
     return [line for line in result.stdout.decode("utf-8", errors="replace").splitlines() if line]
 
 
+def dependency_inventory() -> dict[str, list[dict[str, str]]]:
+    # Git modes expose symlinks and submodules without following either target.
+    result: dict[str, list[dict[str, str]]] = {
+        "working_symlinks": [],
+        "working_submodules": [],
+        "historical_symlinks": [],
+        "historical_submodules": [],
+    }
+    working = git("ls-files", "--stage", "-z")
+    if working.returncode:
+        raise RuntimeError(working.stderr.decode("utf-8", errors="replace"))
+    for raw in working.stdout.split(b"\0"):
+        if not raw:
+            continue
+        metadata, path = raw.decode("utf-8", errors="replace").split("\t", 1)
+        mode, object_id, _stage = metadata.split()
+        if mode == "120000":
+            target = git("show", f":{path}").stdout.decode("utf-8", errors="replace")
+            result["working_symlinks"].append({"path": path, "target": target})
+        elif mode == "160000":
+            result["working_submodules"].append({"path": path, "object": object_id})
+    commits = git("rev-list", "--all")
+    if commits.returncode:
+        raise RuntimeError(commits.stderr.decode("utf-8", errors="replace"))
+    for commit in commits.stdout.decode("ascii", errors="replace").splitlines():
+        listing = git("ls-tree", "-r", "-z", commit)
+        if listing.returncode:
+            raise RuntimeError(listing.stderr.decode("utf-8", errors="replace"))
+        for raw in listing.stdout.split(b"\0"):
+            if not raw:
+                continue
+            metadata, path = raw.decode("utf-8", errors="replace").split("\t", 1)
+            mode, kind, object_id = metadata.split()
+            if mode == "120000":
+                result["historical_symlinks"].append({"commit": commit, "path": path, "object": object_id})
+            elif kind == "commit" or mode == "160000":
+                result["historical_submodules"].append({"commit": commit, "path": path, "object": object_id})
+    return result
+
+
+def linked_artifacts() -> list[dict[str, object]]:
+    # README links are part of the publication surface even when no release asset
+    # exists; every target is listed so no hidden exclusion or private link remains.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    targets = sorted(set(re.findall(r"\]\(([^)\s]+)\)", readme)))
+    public_root = "https://github.com/tasotaku/agent-lab-public"
+    return [
+        {
+            "target": target,
+            "kind": "repository-relative" if "://" not in target else "public-self" if target.startswith(public_root) else "external-public",
+            "public": "://" not in target or target.startswith(public_root),
+        }
+        for target in targets
+    ]
+
+
+def asset_inventory(paths: Iterable[Path]) -> dict[str, object]:
+    # Category counts prove the release is substantive rather than a privacy-clean
+    # empty shell, while named skills make the result reviewable without source search.
+    relative = [path.relative_to(ROOT).as_posix() for path in paths if path.is_file()]
+    shared = sorted({path.split("/")[2] for path in relative if path.startswith("skills/shared/") and len(path.split("/")) > 2})
+    codex = sorted({path.split("/")[2] for path in relative if path.startswith("skills/codex/") and len(path.split("/")) > 2})
+    return {
+        "rules": sum(path.startswith("rules/") for path in relative),
+        "shared_skills": shared,
+        "codex_skills": codex,
+        "tooling": sorted(path for path in relative if path.startswith("tools/") and path.endswith(".py")),
+        "installer": [path for path in relative if path == "bootstrap.py"],
+        "documentation": sorted(path for path in relative if path.endswith(".md")),
+    }
+
+
 def symlink_findings(paths: Iterable[Path]) -> list[Finding]:
     # Public symlinks may only target descendants of the clone, avoiding
     # machine paths and accidental disclosure through escaping links.
@@ -204,6 +277,7 @@ def audit() -> dict[str, object]:
         for category in CATEGORIES
     }
     return {
+        "scanner": {"name": "agent-lab-public-audit", "version": SCANNER_VERSION},
         "verdict": "PASS" if not findings else "FAIL",
         "categories": categories,
         "scanned": {
@@ -211,8 +285,18 @@ def audit() -> dict[str, object]:
             "commits": max(len(commits), commit_message_count),
             "files": file_count,
             "historical_files": historical_files,
-            "ignored_non_public_roots": sorted(SKIP_PARTS),
+            "exclusions": [
+                {
+                    "path": path,
+                    "reason": "local Git metadata, cache, or loop evidence is not tracked public payload",
+                    "risk": "excluded content could be private; Git refs and tracked/untracked non-ignored files remain fully scanned",
+                }
+                for path in sorted(SKIP_PARTS)
+            ],
         },
+        "linked_artifacts": linked_artifacts(),
+        "dependencies": dependency_inventory(),
+        "inventory": asset_inventory(paths),
         "findings": [asdict(finding) for finding in findings],
     }
 
@@ -231,6 +315,9 @@ def print_text(report: dict[str, object]) -> None:
     }
     for key in CATEGORIES:
         print(f"{categories[key]}: {labels[key]}")
+    scanner = report["scanner"]
+    assert isinstance(scanner, dict)
+    print(f"SCANNER: {scanner['name']} version={scanner['version']}")
     scanned = report["scanned"]
     assert isinstance(scanned, dict)
     print(
@@ -238,6 +325,34 @@ def print_text(report: dict[str, object]) -> None:
         f"refs={len(scanned['refs'])} commits={scanned['commits']} "
         f"working_files={scanned['files']} historical_files={scanned['historical_files']}"
     )
+    print("REFS: " + ", ".join(scanned["refs"]))
+    inventory = report["inventory"]
+    assert isinstance(inventory, dict)
+    print(
+        "INVENTORY: "
+        f"rules={inventory['rules']} shared_skills={len(inventory['shared_skills'])} "
+        f"codex_skills={len(inventory['codex_skills'])} tooling={len(inventory['tooling'])} "
+        f"installer={len(inventory['installer'])} documentation={len(inventory['documentation'])}"
+    )
+    print("SHARED_SKILLS: " + ", ".join(inventory["shared_skills"]))
+    print("CODEX_SKILLS: " + ", ".join(inventory["codex_skills"]))
+    artifacts = report["linked_artifacts"]
+    assert isinstance(artifacts, list)
+    for artifact in artifacts:
+        assert isinstance(artifact, dict)
+        print(f"LINKED_ARTIFACT: kind={artifact['kind']} public={artifact['public']} target={artifact['target']}")
+    dependencies = report["dependencies"]
+    assert isinstance(dependencies, dict)
+    for name, items in dependencies.items():
+        print(f"DEPENDENCY_INVENTORY: {name}={len(items)}")
+    exclusions = scanned["exclusions"]
+    assert isinstance(exclusions, list)
+    for exclusion in exclusions:
+        assert isinstance(exclusion, dict)
+        print(
+            f"EXCLUSION: path={exclusion['path']} reason={exclusion['reason']} "
+            f"risk={exclusion['risk']}"
+        )
     findings = report["findings"]
     assert isinstance(findings, list)
     for finding in findings:

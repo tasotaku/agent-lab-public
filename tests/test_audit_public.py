@@ -12,6 +12,12 @@ assert SPEC and SPEC.loader
 audit_public = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = audit_public
 SPEC.loader.exec_module(audit_public)
+COMPATIBILITY_PATH = Path(__file__).resolve().parents[1] / "tools/compatibility.py"
+COMPATIBILITY_SPEC = importlib.util.spec_from_file_location("compatibility", COMPATIBILITY_PATH)
+assert COMPATIBILITY_SPEC and COMPATIBILITY_SPEC.loader
+compatibility = importlib.util.module_from_spec(COMPATIBILITY_SPEC)
+sys.modules[COMPATIBILITY_SPEC.name] = compatibility
+COMPATIBILITY_SPEC.loader.exec_module(compatibility)
 
 
 class PublicAuditTest(unittest.TestCase):
@@ -40,6 +46,36 @@ class PublicAuditTest(unittest.TestCase):
         report = audit_public.audit()
         self.assertEqual(report["verdict"], "PASS", report["findings"])
         self.assertGreaterEqual(report["scanned"]["files"], 20)
+        self.assertEqual(report["scanner"]["version"], "1.1.0")
+        self.assertGreaterEqual(len(report["linked_artifacts"]), 4)
+        self.assertEqual(report["dependencies"]["working_submodules"], [])
+        self.assertGreaterEqual(len(report["inventory"]["shared_skills"]), 6)
+        self.assertTrue(all({"path", "reason", "risk"} <= set(item) for item in report["scanned"]["exclusions"]))
+
+    def test_unsigned_compatibility_evidence_requires_every_component(self) -> None:
+        commit = "a" * 40
+        runs = {
+            "workflow_runs": [
+                {"head_sha": commit, "name": "Cross-platform install", "conclusion": "success"}
+            ]
+        }
+        jobs = {
+            "jobs": [
+                {
+                    "name": f"install-check ({os_name}, 3.13)",
+                    "conclusion": "success",
+                    "html_url": "https://github.com/example/job",
+                    "steps": [
+                        {"name": step, "conclusion": "success"}
+                        for step in compatibility.REQUIRED_STEPS
+                    ],
+                }
+                for os_name in compatibility.REQUIRED_OS
+            ]
+        }
+        evidence, failures = compatibility.evaluate(commit, runs, jobs)
+        self.assertEqual(failures, [])
+        self.assertEqual({item["os"] for item in evidence}, compatibility.REQUIRED_OS)
 
 
 if __name__ == "__main__":
