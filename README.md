@@ -6,20 +6,22 @@ Claude CodeとCodexへ、汎用ルールと再利用可能なスキルを安全�
 private版のknowledge、個人設定、顧客情報、会話履歴、認証情報は含みません。公開内容は
 `python tools/audit_public.py` で、作業ツリー・全Git ref・commit messageまで再検査できます。
 
-## 3分セットアップ
+## 3分セットアップ（まず隔離して試す）
 
 前提はGitとPython 3.9以上です。Claude CodeとCodexへのログインは導入後に各アプリで行います。
-インストーラーは既存設定を変更する前に `~/.agent-lab-public/backups/` へ保存し、管理対象の
-ブロックとスキルだけを更新します。既存の別スキルは削除しません。
+最初の経路はclone内の `sandbox-home` だけへ導入し、通常のClaude/Codex profileを触りません。
+動作確認後に本導入できます。本導入時も既存設定を変更する前に
+`~/.agent-lab-public/backups/` へ保存し、管理対象のブロックとスキルだけを更新します。
+既存の別スキルは削除しません。
 
 ### Windows（PowerShell）
 
 ```powershell
 git clone https://github.com/tasotaku/agent-lab-public.git
 Set-Location agent-lab-public
-python bootstrap.py install
-python bootstrap.py check
-python bootstrap.py smoke
+python bootstrap.py --home "$PWD\sandbox-home" install
+python bootstrap.py --home "$PWD\sandbox-home" check
+python bootstrap.py --home "$PWD\sandbox-home" smoke
 ```
 
 ### macOS / Linux
@@ -27,10 +29,20 @@ python bootstrap.py smoke
 ```bash
 git clone https://github.com/tasotaku/agent-lab-public.git
 cd agent-lab-public
-python3 bootstrap.py install
-python3 bootstrap.py check
-python3 bootstrap.py smoke
+python3 bootstrap.py --home ./sandbox-home install
+python3 bootstrap.py --home ./sandbox-home check
+python3 bootstrap.py --home ./sandbox-home smoke
 ```
+
+隔離試用がPASSしたら、通常profileへ本導入します。
+
+```powershell
+python bootstrap.py install
+python bootstrap.py check
+python bootstrap.py smoke
+```
+
+macOS/Linuxでは上の `python` を `python3` にします。
 
 正常時、`check` はClaude Code/Codexそれぞれのrules・skillsと再利用ツールを項目別に
 `PASS`表示します。`smoke` はインストール先の `test` スキルを実際に読み、利用可能な
