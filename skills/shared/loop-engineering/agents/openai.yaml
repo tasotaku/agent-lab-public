@@ -1,0 +1,4 @@
+interface:
+  display_name: "Loop Engineering"
+  short_description: "固定評価とfresh担当でskill自身を安全に改善する"
+  default_prompt: "Use $loop-engineering to improve the named skill with fixed evidence-based evaluations."

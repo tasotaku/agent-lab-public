@@ -1,0 +1,4 @@
+interface:
+  display_name: "利用者テスト改善ループ"
+  short_description: "実装前に固定した客観journeyを独立テストで満たすまで修正します"
+  default_prompt: "Use $improve-with-user-tests to design an objective user journey before implementation, test it with fresh independent agents, and improve the product until every condition is met."

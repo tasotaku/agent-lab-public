@@ -1,0 +1,4 @@
+interface:
+  display_name: "利用者テスト実行"
+  short_description: "独立担当が固定journeyを実操作し客観的UX条件も測定します"
+  default_prompt: "Use $run-user-tests to execute a fixed user-test specification once and directly measure its functional and interaction expectations."

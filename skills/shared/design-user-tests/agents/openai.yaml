@@ -1,0 +1,4 @@
+interface:
+  display_name: "利用者テスト設計"
+  short_description: "独立担当が客観的な操作条件を含む最小利用者テストを事前設計します"
+  default_prompt: "Use $design-user-tests to create a minimal independent functional and objective UX user-test specification before implementation."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Make Portable"
+  short_description: "別PC向けにシステムの導入と検証の経路をまとめて整備"
+  default_prompt: "Use $make-portable to make this system reproducibly installable on another computer."

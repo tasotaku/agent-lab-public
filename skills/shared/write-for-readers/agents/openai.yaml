@@ -1,0 +1,4 @@
+interface:
+  display_name: "Write for Readers"
+  short_description: "調査や専門情報を、人が理解して判断できる文書に変える"
+  default_prompt: "Use $write-for-readers to turn these source materials into a clear document for the intended reader."
