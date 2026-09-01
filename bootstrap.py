@@ -79,7 +79,7 @@ def install_index(path: Path, home: Path, backup_root: Path) -> str:
         return "REUSED"
     backup(path, home, backup_root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(desired, encoding="utf-8", newline="\n")
+    path.write_text(desired, encoding="utf-8")
     return "INSTALLED"
 
 
