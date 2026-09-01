@@ -1,0 +1,180 @@
+{
+  "schema_version": "user-test-spec/v1",
+  "spec_id": "public-agent-lab",
+  "version": 1,
+  "goal": "A developer can start only from the public repository README, clone and configure a usable generic Claude Code/Codex environment on a supported platform, and verify that the published repository exposes no private knowledge, personal configuration, credentials, customer data, or conversation history.",
+  "persona": "A developer familiar with a terminal who has Git and Python 3 installed, has not used this repository before, and does not have or supply Claude, Codex, GitHub, or other service credentials during the test.",
+  "public_entry": "The rendered repository README at https://github.com/tasotaku/agent-lab-public; after opening it, the executor may follow only commands and links documented in that README.",
+  "test_data": [
+    "Use a new temporary root for every journey and delete only that journey's temporary root after evidence has been retained.",
+    "Redirect HOME, USERPROFILE, XDG_CONFIG_HOME, XDG_CACHE_HOME, APPDATA, LOCALAPPDATA, CODEX_HOME, Claude configuration locations documented by the README, Python caches, and global Git configuration to paths under the journey's temporary root before running repository commands.",
+    "Use no real credentials, tokens, private keys, customer records, personal knowledge files, normal Claude/Codex profiles, or pre-existing clone of the repository.",
+    "Record an action log containing each submitted command, exit code, monotonic start/end timestamps, working directory, relevant isolated environment-variable names and resolved paths, manual browser/terminal surface switches, and README scroll distance in viewport heights; redact environment values if any unexpected secret is encountered.",
+    "For content classification, an obviously synthetic placeholder such as example@example.com, YOUR_TOKEN, or a documented fake fixture is not private data; a realistic credential, person-specific or machine-specific setting, real customer record, exported conversation, or personal/business memory is prohibited.",
+    "Do not follow symlinks or delete paths that resolve outside the journey's temporary root; report any such path as a functional failure.",
+    "Windows is the immediate real-machine platform. macOS and Linux claims may be established by public isolated CI evidence for the exact tested commit."
+  ],
+  "minimal_test_count_rationale": "Three independent journeys are the minimum because a real clean-profile install/use check, multi-OS evidence, and full public-surface privacy review require different environments and evidence types. Combining them would make failures state-dependent; splitting Windows install, check, and smoke use would add tests without adding risk coverage because those steps must share one installation state.",
+  "execution_policy": {
+    "runs_per_test": 1,
+    "continue_after_failure": true,
+    "parallelize_independent_tests": true
+  },
+  "tests": [
+    {
+      "id": "T1",
+      "title": "README-only isolated Windows install and use",
+      "user_task": "Starting from the public README on a clean Windows machine, set up the generic environment, verify it, and exercise one credential-free reusable capability without touching your normal Claude or Codex configuration.",
+      "setup": [
+        "Use a Windows machine with Git and Python 3 available and network access to the public GitHub repository; do not sign in to GitHub or any AI service.",
+        "Open the README URL in a fresh browser tab at 1366x768 with 100% zoom and the page at its top; open a fresh PowerShell terminal whose working directory is the empty isolated temporary root.",
+        "Before the first repository command, apply every isolation redirection listed in test_data and capture hashes plus recursive file inventories of the normal Claude/Codex profile locations (if they exist) for a before/after non-mutation comparison.",
+        "No repository files, commands, instructions, or prior test outcomes are known except what is visible from the public README."
+      ],
+      "actions": [
+        "Read only the public README, find the Windows quick-start path, and submit its documented clone and install/configure commands exactly as shown except for substituting the isolated destination path where the README permits a path value.",
+        "From the resulting clone, run the README-documented check, doctor, or equivalent verification command.",
+        "Run one README-documented credential-free smoke or help operation that loads or exercises an installed reusable tool or skill; if the README offers several, choose the first one presented as the normal smoke path.",
+        "Compare the before/after inventories and hashes of normal Claude/Codex profiles, retain command output and the isolated installed-file inventory as evidence, then remove only the isolated temporary root."
+      ],
+      "functional_expectations": [
+        "The public clone succeeds without authentication and the checked-out origin is https://github.com/tasotaku/agent-lab-public; record the tested commit SHA.",
+        "Every README-documented install/configure command used for the Windows path exits 0 without requesting credentials, access to a private repository, or input that the README did not explain.",
+        "The documented verification command exits 0 and explicitly reports present/valid results for generic rules, at least one reusable skill, reusable tooling, and both Claude Code and Codex configuration targets; a bare process-success message with no component results is insufficient.",
+        "The credential-free smoke/help operation exits 0 and identifies the installed capability from the isolated configured location, demonstrating that the result is consumable rather than merely copied.",
+        "All files created by clone/install/check/smoke resolve under the isolated temporary root, and the before/after inventories and hashes show no change to the machine's normal Claude/Codex profiles.",
+        "No command depends on files outside the fresh clone, Python standard environment, Git installation, or README-declared public dependencies; no broken symlink or symlink escaping the clone/config root is present.",
+        "Cleanup removes only the isolated temporary root and leaves the retained redacted evidence outside it."
+      ],
+      "ux_checks": [
+        "From the initial 1366x768 README viewport through finding the Windows quick start, the executor needs at most 2 viewport-heights of downward scrolling; measure with the browser scroll position, and the visible heading or link must unambiguously distinguish Windows from macOS/Linux.",
+        "From an empty terminal to the first successful component verification, the normal Windows path requires at most 8 shell command submissions and 0 manual searches through repository files; count directly from the terminal action log, excluding the fixture's isolation setup and evidence-capture commands.",
+        "The README path requires at most 2 manual switches between the README browser tab and PowerShell from the first clone command through the smoke operation; count switches in the action log. Copying all commands once before execution is allowed.",
+        "Every command placeholder used by the normal path is explained adjacent to the command or in the immediately linked README section, and success/failure output names the next corrective action without requiring source inspection; record the first unexplained decision or opaque failure as a UX failure.",
+        "The successful verification output presents the component-level result before hashes, internal IDs, or diagnostic detail and is not reasonably confusable with a partial installation; assess the captured output and name the first misleading line if failed.",
+        "Judge whether the README and terminal flow are ready to ship unchanged to the stated developer persona, and report the single largest UX problem even when all numeric checks pass."
+      ],
+      "impossible_if": [
+        "The public GitHub repository cannot be reached from the test machine before any repository response is received.",
+        "The Windows test host lacks working Git or Python 3 despite the fixture precondition and they cannot be restored without changing the fixture.",
+        "The test harness cannot redirect or observe the relevant profile paths, so non-mutation of normal profiles cannot be measured safely."
+      ],
+      "isolation_requirements": "Use a unique temporary root and isolated process environment for this journey. Do not read from, write to, launch with, or authenticate through normal Claude/Codex profiles. Capture normal-profile metadata only for non-mutation comparison, never its file contents. Resolve every cleanup target to an absolute descendant of the temporary root before deletion.",
+      "budget": {
+        "public_steps_minutes": 8,
+        "expected_external_wait_minutes": 4,
+        "total_minutes": 12,
+        "basis": "Up to eight documented shell submissions plus one README scan and one profile comparison should take about eight active minutes; public clone and dependency retrieval receive four additional minutes."
+      }
+    },
+    {
+      "id": "T2",
+      "title": "Exact-commit cross-platform evidence",
+      "user_task": "Use the public README to confirm that the documented setup works in isolated Windows, macOS, and Linux environments for the same published revision, without relying on a maintainer's assertion.",
+      "setup": [
+        "Open the public README in a fresh unsigned browser session at 1366x768 and 100% zoom.",
+        "Use a new isolated temporary root for any clone or downloaded public logs; do not use credentials or a pre-existing checkout.",
+        "The commit SHA under test is the SHA recorded by T1 if available; otherwise obtain it by the README-documented public clone path. T2 remains independent and does not reuse T1 files or session state."
+      ],
+      "actions": [
+        "From the README, follow the documented compatibility/status link to the public automated evidence for the exact commit under test.",
+        "Inspect the run matrix and the logs or artifacts linked from each Windows, macOS, and Linux job; record runner OS/image, commit SHA, invoked public install command, isolation paths or clean-runner evidence, verification result, and completion state.",
+        "Compare the three jobs to the README's platform claims and documented commands, then remove only T2's isolated temporary root."
+      ],
+      "functional_expectations": [
+        "The README publicly claims Windows, macOS, and Linux support and links directly to public automated compatibility evidence without requiring sign-in.",
+        "One completed successful job exists for each of Windows, macOS, and Linux on the exact tested commit SHA; a run from another commit, a skipped job, an allowed-failure job, or a job still in progress does not satisfy the expectation.",
+        "Each OS job starts from a clean hosted runner or equivalently documented isolated HOME/config/cache, uses the README-documented public installer path, runs the documented component verification, and reports valid generic rules, skill, tooling, Claude Code target, and Codex target.",
+        "The logs contain no use of repository, package, Claude, Codex, or cloud-service credentials other than GitHub's platform-provided read-only mechanics for checking out the same public repository; a job that depends on maintainer-only secrets fails.",
+        "The commands evidenced by CI do not contradict the README command for that OS, and platform-specific differences are explicitly documented in the README."
+      ],
+      "ux_checks": [
+        "From the top of the rendered README, platform support and the link to exact-commit compatibility evidence are discoverable within 3 viewport-heights of scrolling at 1366x768; measure browser scroll position.",
+        "From selecting the README compatibility link to seeing the three-OS matrix requires at most 2 link activations and at most 1 manual browser-tab switch, with no site search or guessing a workflow name; count directly in the browser action log.",
+        "The matrix exposes OS name, pass/fail state, and commit identity before raw logs or internal job IDs, so a developer can distinguish full support from partial or stale evidence without opening more than one job per OS.",
+        "Judge whether the compatibility evidence is ready to ship unchanged to the stated developer persona, and report the single largest UX problem even when all numeric checks pass."
+      ],
+      "impossible_if": [
+        "GitHub's public README or automation pages are unavailable before repository-specific content can be observed.",
+        "The public evidence provider suppresses all job status and logs for unsigned viewers, making commit, OS, and verification observations impossible."
+      ],
+      "isolation_requirements": "Use an unsigned browser session and a T2-only temporary root. Do not trigger privileged workflows, provide secrets, reuse T1's clone, or mutate the repository. Public read-only CI status, logs, and artifacts are the only acceptable cross-platform evidence.",
+      "budget": {
+        "public_steps_minutes": 6,
+        "expected_external_wait_minutes": 2,
+        "total_minutes": 8,
+        "basis": "README discovery and review of three already-completed public matrix jobs should take six active minutes, with two minutes allowed for public page/log retrieval."
+      }
+    },
+    {
+      "id": "T3",
+      "title": "Public payload privacy and portability audit",
+      "user_task": "Starting only from the public README, audit everything the repository publishes and confirm that it contains reusable generic assets but no private, personal, credential, customer, or conversation material.",
+      "setup": [
+        "Use a fresh isolated temporary root, unsigned public network access, and no prior clone, private source repository, private knowledge corpus, personal profile, or secret-detection allowlist.",
+        "Open the public README at 1366x768 and 100% zoom. The audit scope is all objects reachable from public branches and tags, commit messages, tracked files, submodule targets, symlink targets as paths, README-linked release assets, and README-linked setup artifacts; standard Git commit author fields and GitHub account/profile metadata are outside payload scope, but author-like data copied into file contents or commit messages is in scope.",
+        "Use the README-documented public audit/privacy command if present. Additional observation may classify its enumerated findings, but may not use commands or hidden allowlists absent from the README."
+      ],
+      "actions": [
+        "Follow the README's documented privacy/audit path to obtain a full public clone or audit artifact and record the exact commit plus every public ref included in the scan.",
+        "Run the README-documented audit command and retain its machine-readable or line-addressable results, including scanner identity/version, enumerated scope, exclusions, and findings.",
+        "Review every non-vendored text finding and all audit-listed high-entropy, credential-pattern, absolute-path, identity, customer-record, conversation/transcript, knowledge/memory, symlink, submodule, and release-asset findings against the prohibited-category definitions in test_data.",
+        "Confirm from the audited inventory that the public payload actually includes generic rules, reusable skills, reusable tooling, installer code, and documentation rather than passing privacy checks as an empty shell; then remove only T3's isolated temporary root."
+      ],
+      "functional_expectations": [
+        "The README documents a reproducible public privacy/audit command that exits 0 on the tested revision and enumerates all public branches/tags and README-linked release/setup artifacts; an audit limited silently to the default working tree is insufficient.",
+        "Credential scanning reports zero verified secrets, tokens, passwords, private keys, credential-bearing URLs, or realistic high-entropy credentials across the full scope. Synthetic placeholders are acceptable only when visibly marked fake and unusable.",
+        "Content/path review finds zero personal configuration payloads: no real absolute user-home paths, usernames, personal email addresses in payload content, machine hostnames, normal-profile copies, editor/session state, or settings tied to one person's accounts or filesystem.",
+        "Content review finds zero private knowledge or customer data: no personal/business memory notes, private project facts, customer names joined with contact/account/ticket/content records, internal-only datasets, or instructions whose usefulness depends on undisclosed private context.",
+        "Content review finds zero conversation history: no exported chats, prompt/response transcripts, tool-call logs, session summaries, or conversation databases; clearly fictional minimal snippets used to explain a generic format are acceptable only when labeled as examples and contain no real identity or context.",
+        "Every submodule URL and README-linked dependency/artifact required by install is publicly readable without credentials; every symlink resolves within its intended public clone/config tree and does not expose a local or private path.",
+        "The audited inventory includes substantive generic rules, at least one reusable skill, reusable tooling, a cross-platform installer, and public setup/verification documentation, and the audit reports no ignored or unclassified non-vendored payload.",
+        "Commit messages in public history contain none of the prohibited categories and no reference to a private filesystem path, private repository URL, credential, customer record, or pasted conversation content."
+      ],
+      "ux_checks": [
+        "From the top of the rendered README, the privacy/publication guarantee and reproducible audit command are discoverable within 3 viewport-heights of scrolling at 1366x768; measure browser scroll position.",
+        "From a completed public clone to a final audit verdict requires at most 3 documented shell command submissions and no manual search for hidden scripts, exclusions, or allowlists; count commands from the terminal action log, excluding fixture setup and evidence capture.",
+        "The final audit summary leads with the five prohibited-category verdicts and scanned-scope counts before hashes or raw diagnostic detail, and any exclusion names the excluded path, reason, and risk; assess the captured output rather than inferring from exit code alone.",
+        "A developer can map every finding to a public ref and file/artifact plus line or object identifier without reading audit implementation source; any unlocatable warning is a UX failure even if the overall command exits 0.",
+        "Judge whether the privacy/audit flow is ready to ship unchanged to the stated developer persona, and report the single largest UX problem even when all numeric checks pass."
+      ],
+      "impossible_if": [
+        "The public repository cannot be cloned and its public refs cannot be enumerated because GitHub is unavailable before repository-specific data is returned.",
+        "A README-linked public release/setup artifact has been removed by its host and no immutable copy or digest-addressed substitute is available, preventing complete payload observation.",
+        "The documented audit requires private credentials or access to non-public source; report impossible rather than supplying those credentials."
+      ],
+      "isolation_requirements": "Use only T3's temporary root, public unsigned access, and README-documented commands. Never compare with or read the private agent-lab repository, personal profiles, private knowledge, credentials, customer data, or prior conversation exports. Resolve cleanup paths before deletion and retain only redacted audit evidence.",
+      "budget": {
+        "public_steps_minutes": 12,
+        "expected_external_wait_minutes": 3,
+        "total_minutes": 15,
+        "basis": "A documented full-ref scan plus manual classification of surfaced findings and inventory completeness is expected to take twelve active minutes; cloning refs and fetching public scan metadata receive three minutes."
+      }
+    }
+  ],
+  "reporting": {
+    "separate_functional_and_ux": true,
+    "include_unexpected_findings": true,
+    "evidence_level": "concise"
+  },
+  "coverage": {
+    "covered_risks": [
+      "README-only discoverability and reproducibility on an immediate Windows machine",
+      "Isolation from normal Claude/Codex profiles and credential-free operation",
+      "Presence and consumability of generic rules, reusable skills, tooling, and both configuration targets",
+      "Cross-platform installer claims for Windows, macOS, and Linux at the exact commit",
+      "Secrets and credentials across public refs, history, and linked artifacts",
+      "Personal configuration and machine-specific path leakage",
+      "Private knowledge, customer data, and conversation-history leakage",
+      "Private dependencies, escaping symlinks, stale evidence, and empty-shell publication",
+      "README and CLI discovery cost, decision ambiguity, and audit-result readability"
+    ],
+    "blind_spots": [
+      "T2 validates macOS and Linux through isolated public CI evidence rather than hands-on use on physical macOS/Linux machines.",
+      "No credentialed end-to-end Claude Code or Codex model invocation is performed, so account login, paid API access, and live model behavior are not covered.",
+      "A context-free public-payload review can detect material that is intrinsically personal or customer-specific, but cannot prove that innocuous-looking text was derived from an undisclosed private source without an external provenance oracle.",
+      "Objects deleted from all public refs before the test and external pages not linked by the README are not observable as current public repository contents."
+    ]
+  },
+  "revision": null
+}
