@@ -11,6 +11,8 @@ from pathlib import Path
 import shutil
 import sys
 
+from tools import session_memory
+
 
 ROOT = Path(__file__).resolve().parent
 SHARED_SKILLS = ROOT / "skills/shared"
@@ -20,6 +22,7 @@ TOOL_SOURCES = {
     "bootstrap.py": ROOT / "bootstrap.py",
     "audit_public.py": ROOT / "tools/audit_public.py",
     "compatibility.py": ROOT / "tools/compatibility.py",
+    "session_memory.py": ROOT / "tools/session_memory.py",
 }
 START = "<!-- agent-lab-public:start -->"
 END = "<!-- agent-lab-public:end -->"
@@ -131,6 +134,7 @@ def target_inventory() -> dict[str, object]:
         {"category": "tooling", "owner": "shared", "root": "home", "path": ".agent-lab-public/tools/bootstrap.py"},
         {"category": "tooling", "owner": "shared", "root": "home", "path": ".agent-lab-public/tools/audit_public.py"},
         {"category": "tooling", "owner": "shared", "root": "home", "path": ".agent-lab-public/tools/compatibility.py"},
+        {"category": "tooling", "owner": "shared", "root": "home", "path": ".agent-lab-public/tools/session_memory.py"},
         {"category": "rules", "owner": "claude-code", "root": "home", "path": ".claude/CLAUDE.md"},
         {"category": "rules", "owner": "codex", "root": "home", "path": ".codex/AGENTS.md"},
     ]
@@ -240,13 +244,47 @@ def smoke(home: Path) -> int:
     return 0
 
 
+def require_agent(agent: str | None) -> str:
+    if agent is None:
+        raise ValueError("--agent claude or --agent codex is required")
+    return agent
+
+
+def install_memory(home: Path, agent: str) -> int:
+    result = install(home)
+    if result:
+        return result
+    path = session_memory.install_hooks(home, agent)
+    print(f"PASS: local session memory installed for {agent}")
+    print(f"hooks: {path}")
+    print(f"NEXT: python bootstrap.py --home \"{home}\" check-memory --agent {agent} --project .")
+    return 0
+
+
+def remove_memory(home: Path, agent: str) -> int:
+    path = session_memory.remove_hooks(home, agent)
+    print(f"PASS: managed session memory hooks removed for {agent}")
+    print(f"settings: {path}")
+    print("KEPT: local journal and current files")
+    return 0
+
+
 def parse_args() -> argparse.Namespace:
     # An explicit home override enables safe trials and CI isolation;
     # normal users need only the three short README commands.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--home", type=Path, default=Path.home())
-    parser.add_argument("command", choices=["install", "check", "smoke", "targets"])
+    parser.add_argument(
+        "command",
+        choices=[
+            "install", "check", "smoke", "targets", "install-memory", "check-memory",
+            "memory-record", "memory-context", "remove-memory",
+        ],
+    )
     parser.add_argument("--format", choices=["json"], default="json")
+    parser.add_argument("--agent", choices=["claude", "codex"])
+    parser.add_argument("--project", type=Path)
+    parser.add_argument("--event", type=Path)
     return parser.parse_args()
 
 
@@ -260,7 +298,24 @@ def main() -> int:
         return install(home)
     if args.command == "check":
         return check(home)
-    return smoke(home)
+    if args.command == "smoke":
+        return smoke(home)
+    agent = require_agent(args.agent)
+    if args.command == "install-memory":
+        return install_memory(home, agent)
+    if args.command == "remove-memory":
+        return remove_memory(home, agent)
+    if args.command == "check-memory":
+        return session_memory.check(home, agent, (args.project or Path.cwd()).expanduser().resolve())
+    event = session_memory.load_event(args.event)
+    project = args.project.expanduser().resolve() if args.project else None
+    if args.command == "memory-record":
+        paths = session_memory.record(home, agent, event, project)
+        print(f"PASS: local session memory recorded\njournal: {paths['entry']}\ncurrent: {paths['current']}")
+        return 0
+    output = session_memory.context(home, event, project)
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": output}}, ensure_ascii=False))
+    return 0
 
 
 if __name__ == "__main__":

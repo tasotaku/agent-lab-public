@@ -6,6 +6,40 @@ Claude CodeとCodexへ、汎用ルールと再利用可能なスキルを安全�
 private版のknowledge、個人設定、顧客情報、会話履歴、認証情報は含みません。公開内容は
 `python tools/audit_public.py` で、作業ツリー・全Git ref・commit messageまで再検査できます。
 
+## セッションの判断経緯をローカルに残す（任意）
+
+この公開版には、セッション終了時に「完了したこと」「判断と理由」「次の作業」を
+project別のjournal/currentへ整理し、次回開始時に同じprojectへ再注入する仕組みもあります。
+会話原本は保存せず、明記されていない判断を推測しません。通信、外部同期、自動pushは行いません。
+
+通常の `install` と独立したopt-inです。まず隔離homeと対象projectを指定して導入・確認します。
+
+```powershell
+python bootstrap.py --home "$PWD\sandbox-home" install-memory --agent claude
+python bootstrap.py --home "$PWD\sandbox-home" check-memory --agent claude --project "$PWD"
+```
+
+macOS/LinuxまたはCodexでは `python3` と `--agent codex` を使います。Claude Codeは
+`~/.claude/settings.json`、Codexは `~/.codex/hooks.json` の既存内容を保ったまま、管理対象の
+SessionEnd/SessionStart hookを各1個追加します。
+
+安全な合成eventで終了・開始処理だけを確認できます。`event.json` には `cwd`、一意な
+`session_id`、合成JSONLへの `transcript_path` を入れます。JSONLには例えば
+`fixture task complete`、`use local journal because fixture must not send externally`、
+`Next: verify start injection` の3行を別messageとして入れてください。
+
+```powershell
+python bootstrap.py --home "$PWD\sandbox-home" memory-record --agent claude --event event.json
+python bootstrap.py --home "$PWD\sandbox-home" memory-context --agent claude --event event.json
+python bootstrap.py --home "$PWD\sandbox-home" check-memory --agent claude --project "$PWD"
+python bootstrap.py --home "$PWD\sandbox-home" remove-memory --agent claude
+```
+
+各コマンドは生成したjournal/currentの絶対path、対象agent/project、hook数を表示します。
+同じsession eventを再投入してもentryは増えません。`remove-memory` はこの仕組みのhookだけを外し、
+作成済みjournal/currentは利用者データとして保持します。詳しい安全境界は
+[SESSION_MEMORY_CONTRACT.md](SESSION_MEMORY_CONTRACT.md) にあります。
+
 ## 3分セットアップ（まず隔離して試す）
 
 前提はGitとPython 3.9以上です。Claude CodeとCodexへのログインは導入後に各アプリで行います。
@@ -97,7 +131,7 @@ python tools/audit_public.py
 - 個人・顧客・案件のknowledge、journal、対話レビュー
 - トークン、cookie、資格情報、通常のClaude/Codex profile
 - Slack、Keychain、会社アカウントなど個人環境への連携
-- 自動push、会話保存、常駐メニューバーなどprivate運用機能
+- 自動push、会話原本の保存、常駐メニューバーなどprivate運用機能
 
 ## 更新と復旧
 

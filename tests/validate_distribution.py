@@ -15,12 +15,16 @@ REQUIRED = {
     ".gitignore",
     "LICENSE",
     "README.md",
+    "SESSION_MEMORY_CONTRACT.md",
     "bootstrap.py",
     "rules/core.md",
     "skills/shared/test/SKILL.md",
     "skills/codex/make-portable/SKILL.md",
     "tools/audit_public.py",
+    "tools/session_memory.py",
     "tests/test_bootstrap.py",
+    "tests/test_session_memory.py",
+    "tests/validate_session_memory_distribution.py",
     "tests/test_audit_public.py",
 }
 FORBIDDEN_ROOTS = {

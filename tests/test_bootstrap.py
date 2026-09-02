@@ -48,7 +48,7 @@ class BootstrapTest(unittest.TestCase):
             self.assertEqual(bootstrap.tree_hash(bootstrap.RULE), bootstrap.tree_hash(bootstrap.installed_rule(home)))
             self.assertEqual(
                 sorted(item["category"] for item in bootstrap.target_inventory()["targets"]),
-                sorted(["rules"] * 3 + ["tooling"] * 3 + ["skills"] * 17),
+                sorted(["rules"] * 3 + ["tooling"] * 4 + ["skills"] * 17),
             )
             self.assertTrue((home / ".claude/skills/test/SKILL.md").is_file())
             self.assertTrue((home / ".agents/skills/make-portable/SKILL.md").is_file())
