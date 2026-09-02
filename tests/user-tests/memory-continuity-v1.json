@@ -1,0 +1,213 @@
+{
+  "schema_version": "user-test-spec/v1",
+  "spec_id": "public-session-memory-bootstrap",
+  "version": 1,
+  "goal": "初見利用者が公開GitHubリポジトリを別PCへcloneし、READMEにある単一のbootstrap入口だけでClaude CodeまたはCodex向けの汎用記録機構を導入・確認し、セッション終了時の要約記録と次セッション開始時の再注入をプロジェクト別のローカルjournal/currentで利用できること。公開物と実行時挙動が実データ、会話原本、認証情報、private remote、自動push、外部送信を含まないこと。",
+  "persona": "Git、Python、Claude CodeまたはCodexのhook設定形式を利用できるが、このリポジトリと記録機構は初見であるWindows/macOS/Linux利用者",
+  "public_entry": "https://github.com/tasotaku/agent-lab-public のリポジトリ先頭READMEと、READMEに掲載された単一のbootstrap入口",
+  "test_data": [
+    "各test専用のfresh VMまたはcontainer、他testと重ならない一意な隔離home、他testと重ならない一意なtemporary projectを使う",
+    "temporary projectは新規Gitリポジトリとして作り、remoteを一切設定しない。通常profile、実在するprivate repo、既存のClaude Code/Codex設定をmountもcopyもしない",
+    "合成session eventと合成transcriptだけを使う。transcriptの事実は『fixture task complete』、判断と理由は『use local journal because fixture must not send externally』、次の作業は『verify start injection』とし、一意なcanaryを付ける。実在人物、実会話、認証情報を含めない",
+    "clone完了後からcleanup確認完了まで、対象process treeのDNS・socket接続を拒否して試行先と時刻を記録するplatform別network observerを使う。cloneそのもののGitHub通信は観測区間外とする",
+    "通常profile候補pathとprivate repo候補pathはtest processから読み取り不可にし、対象process treeによるアクセス試行だけを記録するOS監査を使う。監査担当も対象ファイルの内容は読まない",
+    "terminalの操作event、表示行、command exit code、経過時間を記録できるharnessを使い、操作数・scroll・待ち時間を最終画面から推測しない",
+    "公開cloneの内容に対し、Git remote一覧、秘密情報scanner、data-bearing path一覧を記録する。明示的な合成fixtureを除き、journal/current、session event、transcript、会話原本に該当するデータファイルが同梱されていないことを確認する"
+  ],
+  "minimal_test_count_rationale": "最小は3件。対応OSがWindows、macOS、Linuxの3種類なので、OS固有のbootstrap・path・hook設定・cleanupを実環境で直接確認するには各OSに少なくとも1件が必要である。3件へPython 3.9と3.13、Claude CodeとCodexを割り当てれば、追加journeyなしで両Python境界と両hook形式を覆える。1つのOS内ではinstallから再注入、idempotence、cleanup、privacy/no-networkまで同じ状態の継続が必要なため分割しない。",
+  "execution_policy": {
+    "runs_per_test": 1,
+    "continue_after_failure": true,
+    "parallelize_independent_tests": true
+  },
+  "tests": [
+    {
+      "id": "T1",
+      "title": "Windows・Python 3.9・Claude Codeで全 lifecycle",
+      "user_task": "公開READMEだけを頼りに、このWindows PCの隔離された新規projectへClaude Code用のローカル記録機構を導入し、安全な合成sessionで終了時の記録と次回開始時の引き継ぎを確認した後、重複なく再導入できることと安全に片付けられることを確認してください。",
+      "setup": [
+        "Windowsのfresh環境でPython 3.9とGitをPATHから利用でき、Claude Codeの公開hook設定形式を使える。Python 3.13はこのtestでは使わない",
+        "PowerShell terminalを前面、keyboard focusとcaretがpromptにある状態で開始する。terminal viewportは120列×40行、scrollbackは先頭、ブラウザ・IDE・別terminalは開かない",
+        "一意な隔離homeとremoteなしの一意なtemporary projectを用意し、Claude Code設定は隔離home内に存在しない初見状態にする",
+        "公開repoのcloneに必要な通信だけを許可し、clone成功直後にnetwork deny/observerを有効化する。通常profile/private repo候補pathへのdeny/auditも有効化する"
+      ],
+      "actions": [
+        "公開URLをgit cloneし、clone先のREADMEをterminal内で先頭から読む。READMEが示す通常の導線でinstall/check、SessionEnd、SessionStart、cleanupの説明へ進む",
+        "Claude Code向けとしてREADMEに掲載された単一のbootstrap入口を1回だけ実行する。README外の補助script直接実行、設定ファイルの手編集、source探索はしない",
+        "READMEに記載された公開checkを実行し、隔離homeとtemporary projectを対象にした導入状態を確認する",
+        "合成event/transcriptを、READMEが利用者へ公開するClaude Code SessionEnd確認方法から1回投入する",
+        "checkが示すproject別のローカルjournal/currentを開き、生成物を実際に読む",
+        "同じprojectで、READMEが公開するClaude Code SessionStart確認方法から合成start eventを1回投入し、hookが返す注入内容を読む",
+        "同じbootstrap入口を同じ選択で2回目として実行し、公開check、同じ合成SessionEnd、同じ合成SessionStartを各1回再実行する",
+        "READMEが同じbootstrap入口から案内するcleanup操作を実行し、公開checkで管理対象hookが外れたことを確認する。その後test harnessが隔離home、temporary project、cloneだけを削除する"
+      ],
+      "functional_expectations": [
+        "clone、初回bootstrap、check、合成SessionEnd、合成SessionStart、2回目bootstrap、再check、cleanupはすべてexit code 0で完了し、Python 3.9で動作する",
+        "初回checkはClaude Codeの隔離設定に有効なSessionEnd/SessionStart hookが各1つだけ登録され、対象がtemporary projectとして解決されたことを表示する。Codex設定や通常profileは変更しない",
+        "初回SessionEnd後、checkが示すproject別ローカル保存先にjournalとcurrentが生成され、両者から一意なcanaryと『fixture task complete』『use local journal because fixture must not send externally』およびその理由、『verify start injection』を識別できる。3区分のいずれかが欠落・別区分へ誤分類・捏造されていればFAIL",
+        "初回SessionStartの公開hook出力は、同じprojectのcurrentと直近journalの内容を次セッション用contextとして1回だけ含み、別projectの内容や生の合成transcript全文を含まない",
+        "2回目bootstrap後も管理対象SessionEnd/SessionStart hookは各1つだけで、設定は構文上validである。同じ合成eventを再投入しても、同一eventのjournal entry、currentの3区分、SessionStart注入内容が重複しない",
+        "cleanupは管理対象hookだけを除去し、設定をvalidに保ち、生成済みjournal/currentを利用者データとして保持する。cleanup後の公開checkは未導入状態を明示し、test harnessのfixture削除でこのtestの隔離物だけが消える",
+        "clone済み公開repoのremoteは公開GitHub URLだけで、private remote、自動push設定、実データ、実会話原本、認証情報、明示的な合成fixture以外のsession/journal/currentデータを含まない",
+        "network観測区間にDNS・socket接続の成功も試行も0件で、git pushを含む外部process起動も0件である。通常profile/private repo候補pathへのアクセス試行も0件である",
+        "bootstrap・hook・checkのstdout/stderr、設定、journal/currentに認証情報要求、外部送信先、private remote、自動push指示が現れない"
+      ],
+      "ux_checks": [
+        "120×40 terminalでREADMEを先頭表示してからbootstrap command全体が見えるまでのscrollはPageDown換算2回以内。開始行、各scroll event、command全体が初めて同時表示された行をterminal harnessで直接記録する",
+        "bootstrap commandを見つけてから初回check成功まで、利用者のcommand submitはbootstrapとcheckの2回以内、bootstrap中の選択入力は2回以内、追加の手動window/tab切替は0回、設定ファイル編集は0回。terminal input eventで直接数える",
+        "bootstrap submitを開始event、成功または失敗の明示表示を終了eventとして単調時計で測り、network deny下で60秒以内に終了する。無表示のまま10秒を超える区間がなく、終了時に次のcheck commandまたは回復手順が同じ120×40 viewportに見える",
+        "check結果は成功/失敗、対象agent、対象project、journal/currentの解決先、SessionEnd/SessionStart hook状態を120×40 viewport内でclippingなく識別でき、成功時に内部hashや診断IDがこれらより先に主結果として表示されない",
+        "SessionEnd確認開始から生成先を特定してcurrentを読むまで、READMEへ戻る操作は0回、手動window/tab切替は0回、公開command submitは2回以内、terminal scrollはPageDown換算1回以内。input/scroll logで直接数える",
+        "SessionStart確認のcommand submitから10秒以内に注入内容が同じterminal前面へ表示され、focusはterminal promptに戻る。開始はEnter event、終了はcanaryを含むhook output event、focusはterminal harnessで直接観測する",
+        "2回目bootstrapまたはcleanupが失敗した場合、既存journal/currentを破壊しない回復案内が最後の120×40 viewportに表示される。成功と失敗を文言またはexit codeで取り違えられる表示ならUX FAIL",
+        "journey完了時、executorは『初見の通常利用者向けとしてこのまま出荷できるか』をYes/Noで答え、最大のUX問題を1件、対象stepと直接観測値を添えて報告する"
+      ],
+      "impossible_if": [
+        "公開GitHub URLがclone不能で、同じ実行時間帯にGitHub到達性またはrepository不存在が独立に確認された場合",
+        "fresh Windows実行環境で要求されたPython 3.9、Git、Claude Code hook形式のいずれかを提供できず、代替executorも確保できない場合",
+        "network/process/file-access observerが開始前検証に失敗し、privacy/no-network条件を直接観測できない場合"
+      ],
+      "isolation_requirements": "T1専用Windows環境、一意な隔離home、一意なtemporary project、一意な合成canary、一意なclone先を使う。他testや通常profileの設定・journal・repoを共有せず、終了時はcleanup観測後にfixtureだけを削除する。",
+      "budget": {
+        "public_steps_minutes": 10,
+        "expected_external_wait_minutes": 1,
+        "total_minutes": 11,
+        "basis": "clone、README確認、bootstrap/check、2回の合成lifecycle、再bootstrap、cleanupをterminalで行う10分に、公開GitHubからのclone待ち1分を加えた"
+      }
+    },
+    {
+      "id": "T2",
+      "title": "macOS・Python 3.13・Codexで全 lifecycle",
+      "user_task": "公開READMEだけを頼りに、このMacの隔離された新規projectへCodex用のローカル記録機構を導入し、安全な合成sessionで終了時の記録と次回開始時の引き継ぎを確認した後、重複なく再導入できることと安全に片付けられることを確認してください。",
+      "setup": [
+        "macOSのfresh環境でPython 3.13とGitをPATHから利用でき、Codexの公開hook設定形式を使える。Python 3.9はこのtestでは使わない",
+        "Terminalを前面、keyboard focusとcaretがpromptにある状態で開始する。terminal viewportは120列×40行、scrollbackは先頭、ブラウザ・IDE・別terminalは開かない",
+        "一意な隔離homeとremoteなしの一意なtemporary projectを用意し、Codex設定は隔離home内に存在しない初見状態にする",
+        "公開repoのcloneに必要な通信だけを許可し、clone成功直後にnetwork deny/observerを有効化する。通常profile/private repo候補pathへのdeny/auditも有効化する"
+      ],
+      "actions": [
+        "公開URLをgit cloneし、clone先のREADMEをterminal内で先頭から読む。READMEが示す通常の導線でinstall/check、SessionEnd相当、SessionStart相当、cleanupの説明へ進む",
+        "Codex向けとしてREADMEに掲載された単一のbootstrap入口を1回だけ実行する。README外の補助script直接実行、設定ファイルの手編集、source探索はしない",
+        "READMEに記載された公開checkを実行し、隔離homeとtemporary projectを対象にした導入状態を確認する",
+        "合成event/transcriptを、READMEが利用者へ公開するCodexのセッション終了hook確認方法から1回投入する",
+        "checkが示すproject別のローカルjournal/currentを開き、生成物を実際に読む",
+        "同じprojectで、READMEが公開するCodexのセッション開始hook確認方法から合成start eventを1回投入し、hookが返す注入内容を読む",
+        "同じbootstrap入口を同じ選択で2回目として実行し、公開check、同じ合成終了event、同じ合成開始eventを各1回再実行する",
+        "READMEが同じbootstrap入口から案内するcleanup操作を実行し、公開checkで管理対象hookが外れたことを確認する。その後test harnessが隔離home、temporary project、cloneだけを削除する"
+      ],
+      "functional_expectations": [
+        "clone、初回bootstrap、check、合成終了event、合成開始event、2回目bootstrap、再check、cleanupはすべてexit code 0で完了し、Python 3.13で動作する",
+        "初回checkはCodexの隔離設定に有効な終了/開始hookが各1つだけ登録され、対象がtemporary projectとして解決されたことを表示する。Claude Code設定や通常profileは変更しない",
+        "初回終了event後、checkが示すproject別ローカル保存先にjournalとcurrentが生成され、両者から一意なcanaryと『fixture task complete』『use local journal because fixture must not send externally』およびその理由、『verify start injection』を識別できる。3区分のいずれかが欠落・別区分へ誤分類・捏造されていればFAIL",
+        "初回開始eventの公開hook出力は、同じprojectのcurrentと直近journalの内容を次セッション用contextとして1回だけ含み、別projectの内容や生の合成transcript全文を含まない",
+        "2回目bootstrap後も管理対象の終了/開始hookは各1つだけで、設定は構文上validである。同じ合成eventを再投入しても、同一eventのjournal entry、currentの3区分、開始時注入内容が重複しない",
+        "cleanupは管理対象hookだけを除去し、設定をvalidに保ち、生成済みjournal/currentを利用者データとして保持する。cleanup後の公開checkは未導入状態を明示し、test harnessのfixture削除でこのtestの隔離物だけが消える",
+        "clone済み公開repoのremoteは公開GitHub URLだけで、private remote、自動push設定、実データ、実会話原本、認証情報、明示的な合成fixture以外のsession/journal/currentデータを含まない",
+        "network観測区間にDNS・socket接続の成功も試行も0件で、git pushを含む外部process起動も0件である。通常profile/private repo候補pathへのアクセス試行も0件である",
+        "bootstrap・hook・checkのstdout/stderr、設定、journal/currentに認証情報要求、外部送信先、private remote、自動push指示が現れない"
+      ],
+      "ux_checks": [
+        "120×40 terminalでREADMEを先頭表示してからbootstrap command全体が見えるまでのscrollはPageDown換算2回以内。開始行、各scroll event、command全体が初めて同時表示された行をterminal harnessで直接記録する",
+        "bootstrap commandを見つけてから初回check成功まで、利用者のcommand submitはbootstrapとcheckの2回以内、bootstrap中の選択入力は2回以内、追加の手動window/tab切替は0回、設定ファイル編集は0回。terminal input eventで直接数える",
+        "bootstrap submitを開始event、成功または失敗の明示表示を終了eventとして単調時計で測り、network deny下で60秒以内に終了する。無表示のまま10秒を超える区間がなく、終了時に次のcheck commandまたは回復手順が同じ120×40 viewportに見える",
+        "check結果は成功/失敗、対象agent、対象project、journal/currentの解決先、終了/開始hook状態を120×40 viewport内でclippingなく識別でき、成功時に内部hashや診断IDがこれらより先に主結果として表示されない",
+        "終了event確認開始から生成先を特定してcurrentを読むまで、READMEへ戻る操作は0回、手動window/tab切替は0回、公開command submitは2回以内、terminal scrollはPageDown換算1回以内。input/scroll logで直接数える",
+        "開始event確認のcommand submitから10秒以内に注入内容が同じterminal前面へ表示され、focusはterminal promptに戻る。開始はEnter event、終了はcanaryを含むhook output event、focusはterminal harnessで直接観測する",
+        "2回目bootstrapまたはcleanupが失敗した場合、既存journal/currentを破壊しない回復案内が最後の120×40 viewportに表示される。成功と失敗を文言またはexit codeで取り違えられる表示ならUX FAIL",
+        "journey完了時、executorは『初見の通常利用者向けとしてこのまま出荷できるか』をYes/Noで答え、最大のUX問題を1件、対象stepと直接観測値を添えて報告する"
+      ],
+      "impossible_if": [
+        "公開GitHub URLがclone不能で、同じ実行時間帯にGitHub到達性またはrepository不存在が独立に確認された場合",
+        "fresh macOS実行環境で要求されたPython 3.13、Git、Codex hook形式のいずれかを提供できず、代替executorも確保できない場合",
+        "network/process/file-access observerが開始前検証に失敗し、privacy/no-network条件を直接観測できない場合"
+      ],
+      "isolation_requirements": "T2専用macOS環境、一意な隔離home、一意なtemporary project、一意な合成canary、一意なclone先を使う。他testや通常profileの設定・journal・repoを共有せず、終了時はcleanup観測後にfixtureだけを削除する。",
+      "budget": {
+        "public_steps_minutes": 10,
+        "expected_external_wait_minutes": 1,
+        "total_minutes": 11,
+        "basis": "clone、README確認、bootstrap/check、2回の合成lifecycle、再bootstrap、cleanupをterminalで行う10分に、公開GitHubからのclone待ち1分を加えた"
+      }
+    },
+    {
+      "id": "T3",
+      "title": "Linux・Python 3.9・Codexで全 lifecycle",
+      "user_task": "公開READMEだけを頼りに、このLinux PCの隔離された新規projectへCodex用のローカル記録機構を導入し、安全な合成sessionで終了時の記録と次回開始時の引き継ぎを確認した後、重複なく再導入できることと安全に片付けられることを確認してください。",
+      "setup": [
+        "Linuxのfresh環境でPython 3.9とGitをPATHから利用でき、Codexの公開hook設定形式を使える。Python 3.13はこのtestでは使わない",
+        "terminal emulatorを前面、keyboard focusとcaretがpromptにある状態で開始する。terminal viewportは120列×40行、scrollbackは先頭、ブラウザ・IDE・別terminalは開かない",
+        "一意な隔離homeとremoteなしの一意なtemporary projectを用意し、Codex設定は隔離home内に存在しない初見状態にする",
+        "公開repoのcloneに必要な通信だけを許可し、clone成功直後にnetwork namespaceまたは同等のdeny/observerを有効化する。通常profile/private repo候補pathへのdeny/auditも有効化する"
+      ],
+      "actions": [
+        "公開URLをgit cloneし、clone先のREADMEをterminal内で先頭から読む。READMEが示す通常の導線でinstall/check、SessionEnd相当、SessionStart相当、cleanupの説明へ進む",
+        "Codex向けとしてREADMEに掲載された単一のbootstrap入口を1回だけ実行する。README外の補助script直接実行、設定ファイルの手編集、source探索はしない",
+        "READMEに記載された公開checkを実行し、隔離homeとtemporary projectを対象にした導入状態を確認する",
+        "合成event/transcriptを、READMEが利用者へ公開するCodexのセッション終了hook確認方法から1回投入する",
+        "checkが示すproject別のローカルjournal/currentを開き、生成物を実際に読む",
+        "同じprojectで、READMEが公開するCodexのセッション開始hook確認方法から合成start eventを1回投入し、hookが返す注入内容を読む",
+        "同じbootstrap入口を同じ選択で2回目として実行し、公開check、同じ合成終了event、同じ合成開始eventを各1回再実行する",
+        "READMEが同じbootstrap入口から案内するcleanup操作を実行し、公開checkで管理対象hookが外れたことを確認する。その後test harnessが隔離home、temporary project、cloneだけを削除する"
+      ],
+      "functional_expectations": [
+        "clone、初回bootstrap、check、合成終了event、合成開始event、2回目bootstrap、再check、cleanupはすべてexit code 0で完了し、Python 3.9で動作する",
+        "初回checkはCodexの隔離設定に有効な終了/開始hookが各1つだけ登録され、対象がtemporary projectとして解決されたことを表示する。Claude Code設定や通常profileは変更しない",
+        "初回終了event後、checkが示すproject別ローカル保存先にjournalとcurrentが生成され、両者から一意なcanaryと『fixture task complete』『use local journal because fixture must not send externally』およびその理由、『verify start injection』を識別できる。3区分のいずれかが欠落・別区分へ誤分類・捏造されていればFAIL",
+        "初回開始eventの公開hook出力は、同じprojectのcurrentと直近journalの内容を次セッション用contextとして1回だけ含み、別projectの内容や生の合成transcript全文を含まない",
+        "2回目bootstrap後も管理対象の終了/開始hookは各1つだけで、設定は構文上validである。同じ合成eventを再投入しても、同一eventのjournal entry、currentの3区分、開始時注入内容が重複しない",
+        "cleanupは管理対象hookだけを除去し、設定をvalidに保ち、生成済みjournal/currentを利用者データとして保持する。cleanup後の公開checkは未導入状態を明示し、test harnessのfixture削除でこのtestの隔離物だけが消える",
+        "clone済み公開repoのremoteは公開GitHub URLだけで、private remote、自動push設定、実データ、実会話原本、認証情報、明示的な合成fixture以外のsession/journal/currentデータを含まない",
+        "network観測区間にDNS・socket接続の成功も試行も0件で、git pushを含む外部process起動も0件である。通常profile/private repo候補pathへのアクセス試行も0件である",
+        "bootstrap・hook・checkのstdout/stderr、設定、journal/currentに認証情報要求、外部送信先、private remote、自動push指示が現れない"
+      ],
+      "ux_checks": [
+        "120×40 terminalでREADMEを先頭表示してからbootstrap command全体が見えるまでのscrollはPageDown換算2回以内。開始行、各scroll event、command全体が初めて同時表示された行をterminal harnessで直接記録する",
+        "bootstrap commandを見つけてから初回check成功まで、利用者のcommand submitはbootstrapとcheckの2回以内、bootstrap中の選択入力は2回以内、追加の手動window/tab切替は0回、設定ファイル編集は0回。terminal input eventで直接数える",
+        "bootstrap submitを開始event、成功または失敗の明示表示を終了eventとして単調時計で測り、network deny下で60秒以内に終了する。無表示のまま10秒を超える区間がなく、終了時に次のcheck commandまたは回復手順が同じ120×40 viewportに見える",
+        "check結果は成功/失敗、対象agent、対象project、journal/currentの解決先、終了/開始hook状態を120×40 viewport内でclippingなく識別でき、成功時に内部hashや診断IDがこれらより先に主結果として表示されない",
+        "終了event確認開始から生成先を特定してcurrentを読むまで、READMEへ戻る操作は0回、手動window/tab切替は0回、公開command submitは2回以内、terminal scrollはPageDown換算1回以内。input/scroll logで直接数える",
+        "開始event確認のcommand submitから10秒以内に注入内容が同じterminal前面へ表示され、focusはterminal promptに戻る。開始はEnter event、終了はcanaryを含むhook output event、focusはterminal harnessで直接観測する",
+        "2回目bootstrapまたはcleanupが失敗した場合、既存journal/currentを破壊しない回復案内が最後の120×40 viewportに表示される。成功と失敗を文言またはexit codeで取り違えられる表示ならUX FAIL",
+        "journey完了時、executorは『初見の通常利用者向けとしてこのまま出荷できるか』をYes/Noで答え、最大のUX問題を1件、対象stepと直接観測値を添えて報告する"
+      ],
+      "impossible_if": [
+        "公開GitHub URLがclone不能で、同じ実行時間帯にGitHub到達性またはrepository不存在が独立に確認された場合",
+        "fresh Linux実行環境で要求されたPython 3.9、Git、Codex hook形式のいずれかを提供できず、代替executorも確保できない場合",
+        "network/process/file-access observerが開始前検証に失敗し、privacy/no-network条件を直接観測できない場合"
+      ],
+      "isolation_requirements": "T3専用Linux環境、一意な隔離home、一意なtemporary project、一意な合成canary、一意なclone先を使う。他testや通常profileの設定・journal・repoを共有せず、終了時はcleanup観測後にfixtureだけを削除する。",
+      "budget": {
+        "public_steps_minutes": 10,
+        "expected_external_wait_minutes": 1,
+        "total_minutes": 11,
+        "basis": "clone、README確認、bootstrap/check、2回の合成lifecycle、再bootstrap、cleanupをterminalで行う10分に、公開GitHubからのclone待ち1分を加えた"
+      }
+    }
+  ],
+  "reporting": {
+    "separate_functional_and_ux": true,
+    "include_unexpected_findings": true,
+    "evidence_level": "concise"
+  },
+  "coverage": {
+    "covered_risks": [
+      "Windows、macOS、LinuxでREADMEの単一bootstrap入口から導入できること",
+      "Python 3.9と3.13の両対応境界",
+      "Claude CodeとCodexのhook設定形式、終了時記録、開始時再注入",
+      "やったこと・重要な判断と理由・次の作業の欠落、誤分類、捏造、重複",
+      "project別journal/currentの生成先と別project混入",
+      "再bootstrapおよび同一event再投入のidempotence",
+      "管理対象hookだけを外し利用者journal/currentを保持するcleanup",
+      "README入口の発見可能性、terminal内の操作数、scroll、待ち時間、focus、結果の理解可能性",
+      "実データ、会話原本、認証情報、private remote、自動push、外部送信の混入",
+      "通常profileとprivate repoを読まない隔離性"
+    ],
+    "blind_spots": [
+      "Python 3.10、3.11、3.12、およびOSの全distribution/versionの組合せは実行しない",
+      "実在するClaude Code/Codexの対話セッションや実会話はprivacy要件上使わず、公開hook形式へ投入する合成eventで検証する",
+      "既存の複雑な利用者hook設定とのmerge互換性はclean隔離homeを前提とする本仕様では検証しない",
+      "GitHubからcloneする区間の通信は公開入口利用に必須のためno-network判定の対象外であり、clone完了後だけを0通信条件として観測する"
+    ]
+  },
+  "revision": null
+}
