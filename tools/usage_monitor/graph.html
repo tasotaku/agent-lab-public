@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codex 使用量の推移</title>
+<style>
+:root{color-scheme:light;--ink:#1d2e3b;--muted:#536573;--blue:#1766be;--orange:#af510c;--gap:#e8ecf0}
+*{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:var(--ink);font:15px/1.6 system-ui,-apple-system,sans-serif}
+main{max-width:1160px;margin:auto;padding:28px 32px}h1{font-size:26px;margin:0 0 4px}h2{font-size:17px;margin:0}
+p{margin:4px 0;color:var(--muted)}header{margin-bottom:20px}.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0}
+label{font-size:13px}select{margin-left:6px;padding:7px;border:1px solid #bdc9d4;border-radius:6px;background:white;color:var(--ink);font:inherit;max-width:100%}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.stat,section{background:#fff;border:1px solid #dce3eb;border-radius:10px;padding:16px}
+.stat span{display:block;color:var(--muted);font-size:13px}.stat strong{font-size:26px;font-weight:650}section{margin:12px 0;padding-bottom:10px}
+svg{display:block;width:100%;height:auto;overflow:visible;touch-action:pan-y}svg text{font:12px system-ui,sans-serif;fill:var(--muted)}
+.readout{min-height:26px;font-size:13px;color:var(--muted);margin-top:2px}.legend{font-size:13px;margin-top:12px}.swatch{display:inline-block;width:14px;height:12px;background:var(--gap);vertical-align:middle;margin-right:5px}
+footer{font-size:12px;color:var(--muted);margin-top:18px}.empty{padding:20px;text-align:center}
+@media(max-width:600px){main{padding:18px 12px}h1{font-size:22px}.stats{gap:6px}.stat{padding:10px}.stat strong{font-size:20px}section{padding:12px}select{font-size:13px}.controls label{width:100%}}
+</style>
+<main>
+<header><h1>Codex 使用量の推移</h1><p>枠をどれだけ使ったか、どの時間帯に増えたか。</p></header>
+<div class="controls">
+<label>使用枠<select id="series" aria-label="使用枠"></select></label>
+<label>表示期間<select id="range" aria-label="表示期間"><option value="0">記録全体</option><option value="24">直近24時間</option><option value="6">直近6時間</option><option value="1">直近1時間</option></select></label>
+</div>
+<p id="period"></p>
+<div class="stats">
+<div class="stat"><span>最新の使用率</span><strong id="latest">—</strong><span id="latestTime"></span></div>
+<div class="stat"><span>表示期間の最初 → 最後</span><strong id="endpoints">—</strong><span>観測値の比較（空白区間を含む）</span></div>
+<div class="stat"><span>約10分の増加量・最大</span><strong id="peak">—</strong><span id="peakTime">有効な比較のみ</span></div>
+</div>
+<section><h2>使用率 <small>（%）</small></h2><p>線が上がるほど使用枠を消費。縦軸は0〜100%。</p>
+<svg id="usage" viewBox="0 0 1000 230" role="img" aria-label="使用率の時系列グラフ"></svg><div class="readout" id="usageDetail">グラフにカーソルを合わせる／タップすると記録の詳細を表示</div></section>
+<section><h2>直近約10分の増加量 <small>（ポイント）</small></h2><p>24% → 26%なら2ポイント。空白は比較できなかった時間。</p>
+<svg id="delta" viewBox="0 0 1000 230" role="img" aria-label="約10分の使用率増加量の時系列グラフ"></svg><div class="readout" id="deltaDetail">グラフにカーソルを合わせる／タップすると記録の詳細を表示</div></section>
+<div class="legend"><span class="swatch"></span>灰色は記録間隔が90秒を超えた区間。線の切れ目は取得失敗・リセット・使用率の減少も含む。</div>
+<p id="health" class="legend"></p>
+<footer>日本時間（JST）。使用率はアカウント全体の値で、記録したPCだけの消費ではありません。<br>
+この画面は生成時点の記録です。最新データを見るにはグラフを再生成してください。使用率の丸め・反映遅れがあるため増加量は近似です。</footer>
+</main>
+<script id="recordings" type="application/json">@@DATA@@</script>
+<script>
+'use strict';
+const data=JSON.parse(document.getElementById('recordings').textContent);
+const $=id=>document.getElementById(id);
+const date=new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+const fmt=t=>date.format(new Date(t));
+const status={ok:'比較できた記録',warming_up:'比較履歴がまだ不足',gap:'比較期間に記録の空白',counter_decreased:'使用率が減少',fetch_error:'取得失敗'};
+for(const [i,s] of data.entries()){const option=document.createElement('option');option.value=i;option.textContent=s.label;$('series').append(option)}
+
+function chart(id,rows,key,maximum,start,end){
+  // AI_NOTE: Unknown values and reset/decrease boundaries split paths rather than inventing zeroes.
+  const svg=$(id),left=52,right=978,top=16,bottom=192;
+  const x=t=>left+(t-start)/(end-start)*(right-left),y=v=>bottom-v/maximum*(bottom-top);
+  const elements=[];
+  function add(tag,attrs,text){const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;elements.push(el);return el}
+  for(let i=1;i<rows.length;i++)if(rows[i].t-rows[i-1].t>90000)add('rect',{x:x(rows[i-1].t),y:top,width:x(rows[i].t)-x(rows[i-1].t),height:bottom-top,fill:'#e8ecf0'});
+  for(let i=0;i<=4;i++){const value=maximum*i/4;add('line',{x1:left,x2:right,y1:y(value),y2:y(value),stroke:'#dce3eb'});add('text',{x:left-10,y:y(value)+4,'text-anchor':'end'},Number(value.toFixed(2)).toString())}
+  for(let i=0;i<=4;i++){const t=start+(end-start)*i/4;add('text',{x:x(t),y:220,'text-anchor':i===0?'start':i===4?'end':'middle'},fmt(t))}
+  let path='',previous=null;
+  for(const row of rows){
+    const value=row[key];
+    if(value===null){previous=null;continue}
+    const connected=previous&&row.t-previous.t<=90000&&row.reset===previous.reset&&row.used>=previous.used;
+    if(connected)path+=` L${x(row.t)} ${y(previous[key])} L${x(row.t)} ${y(value)}`;
+    else path+=` M${x(row.t)} ${y(value)}`;
+    add('circle',{cx:x(row.t),cy:y(value),r:1.7,fill:key==='used'?'#1766be':'#af510c'});
+    previous=row;
+  }
+  add('path',{d:path,fill:'none',stroke:key==='used'?'#1766be':'#af510c','stroke-width':2,'stroke-linejoin':'round'});
+  if(!rows.some(row=>row[key]!==null))add('text',{x:500,y:100,'text-anchor':'middle'},'この期間には比較可能な記録がありません');
+  const cursor=add('line',{x1:left,x2:left,y1:top,y2:bottom,stroke:'#718293','stroke-dasharray':'4 4',visibility:'hidden'});
+  svg.replaceChildren(...elements);
+  svg.onpointermove=svg.onpointerdown=event=>{
+    // AI_NOTE: Show the nearest recorded value, including unknown/error states, without interpolation.
+    const bounds=svg.getBoundingClientRect(),pos=(event.clientX-bounds.left)/bounds.width*1000;
+    const t=start+(pos-left)/(right-left)*(end-start);
+    const index=rows.findIndex(row=>row.t>=t);
+    let row=index<0?rows.at(-1):rows[index];
+    if(index>0&&Math.abs(rows[index-1].t-t)<Math.abs(row.t-t))row=rows[index-1];
+    if(!row)return;
+    const value=row[key],unit=key==='used'?'%':'ポイント';
+    const span=key==='delta'&&row.seconds!==null?`（実測${Math.round(row.seconds)}秒）`:'';
+    const distant=Math.abs(row.t-t)>90000?' · カーソル付近は記録なし。最寄りの記録：':'';
+    $(id+'Detail').textContent=`${distant}${fmt(row.t)} · ${value===null?'不明':value+unit}${span} · ${status[row.status]||row.status}`;
+    cursor.setAttribute('x1',x(row.t));cursor.setAttribute('x2',x(row.t));cursor.setAttribute('visibility','visible');
+  };
+}
+
+function render(){
+  // AI_NOTE: Range selection is anchored to the latest recording, not the time an old report is opened.
+  const series=data[Number($('series').value)],all=series.samples,hours=Number($('range').value);
+  const last=all.at(-1).t,start=hours?last-hours*3600000:all[0].t;
+  const rows=all.filter(row=>row.t>=start),valid=rows.filter(row=>row.used!==null);
+  const latest=valid.at(-1),first=valid[0],deltas=rows.filter(row=>row.delta!==null);
+  const peak=deltas.reduce((best,row)=>!best||row.delta>best.delta?row:best,null);
+  $('period').textContent=`${series.plan} · ${fmt(start)} 〜 ${fmt(last)} · ${rows.length}件の記録`;
+  $('latest').textContent=latest?`${latest.used}%`:'不明';$('latestTime').textContent=latest?fmt(latest.t)+' 時点':'この期間は取得なし';
+  $('endpoints').textContent=first?`${first.used}% → ${latest.used}%`:'不明';
+  $('peak').textContent=peak?`${peak.delta} ポイント`:'不明';$('peakTime').textContent=peak?fmt(peak.t)+' 時点':'この期間は有効な比較なし';
+  const gaps=rows.slice(1).filter((row,i)=>row.t-rows[i].t>90000).length,errors=rows.filter(row=>row.status==='fetch_error').length;
+  $('health').textContent=`表示期間：記録の空白 ${gaps}区間 · 取得失敗 ${errors}件 · 約10分の有効な比較 ${deltas.length}件`;
+  $('usageDetail').textContent=$('deltaDetail').textContent='グラフにカーソルを合わせる／タップすると記録の詳細を表示';
+  chart('usage',rows,'used',100,start,last===start?last+60000:last);
+  chart('delta',rows,'delta',Math.max(1,Math.ceil(peak?.delta||0)),start,last===start?last+60000:last);
+}
+$('series').onchange=$('range').onchange=render;render();
+</script>
+</html>

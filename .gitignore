@@ -7,4 +7,8 @@ __pycache__/
 tests/temp/
 tests/evidence/
 .agent-lab-public/
-
+.agent-lab/
+# Usage recordings and reports are local runtime data.
+codex-usage.csv
+usage-graph.html
+collector.log

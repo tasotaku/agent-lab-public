@@ -6,6 +6,13 @@ Claude CodeとCodexへ、汎用ルールと再利用可能なスキルを安全�
 private版のknowledge、個人設定、顧客情報、会話履歴、認証情報は含みません。公開内容は
 `python tools/audit_public.py` で、作業ツリー・全Git ref・commit messageまで再検査できます。
 
+## Codexの定額使用率を記録する（任意）
+
+[使用量モニター](tools/usage_monitor/README.md)を追加しています。Python 3.10以上とCodex CLIの既存ログインを使い、
+macOS・Windowsで1分ごとに使用率をCSVへ記録し、約10分の増加量をオフラインのグラフで表示します。
+AIの会話は開始しません。記録・認証情報は各PCへ残り、公開リポジトリには入りません。
+閾値による警告・AI実行停止は未実装です。通常のセットアップとは独立して、明示的に導入します。
+
 ## セッションの判断経緯をローカルに残す（任意）
 
 この公開版には、セッション終了時に「完了したこと」「判断と理由」「次の作業」を
@@ -125,6 +132,7 @@ python tools/audit_public.py
 - `skills/codex/`: Codex向けに手順が異なるスキルのoverride
 - [bootstrap.py](bootstrap.py): 標準ライブラリだけで動くinstall/check/smoke
 - [tools/audit_public.py](tools/audit_public.py): 公開payloadとGit履歴の監査
+- [tools/usage_monitor/](tools/usage_monitor/README.md): Codexの定額使用率の記録とグラフ生成（任意）
 
 入らないもの:
 

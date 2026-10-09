@@ -52,3 +52,17 @@ jobs:
         run: ${{ matrix.executable }} tools/audit_public.py
       - name: Run unit and distribution tests
         run: ${{ matrix.executable }} tests/validate_distribution.py
+      - name: Verify offline usage monitor with synthetic data
+        if: matrix.python == '3.13'
+        run: ${{ matrix.executable }} tests/validate_usage_monitor.py
+
+  windows-usage-recording:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Verify opt-in recording, task lifecycle, and offline graph
+        shell: powershell
+        run: .\tools\usage_monitor\verify-windows.ps1
