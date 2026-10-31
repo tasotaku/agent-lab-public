@@ -48,6 +48,8 @@ jobs:
         run: ${{ matrix.executable }} bootstrap.py --home "${{ runner.temp }}/agent-lab-home" smoke
       - name: Verify session memory lifecycle
         run: ${{ matrix.executable }} tests/validate_session_memory_distribution.py
+      - name: Verify opt-in Slack queues and hook lifecycle without network
+        run: ${{ matrix.executable }} tests/validate_slack_soliloquy.py
       - name: Audit public payload and history
         run: ${{ matrix.executable }} tools/audit_public.py
       - name: Run unit and distribution tests

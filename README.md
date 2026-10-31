@@ -6,6 +6,12 @@ Claude CodeとCodexへ、汎用ルールと再利用可能なスキルを安全�
 private版のknowledge、個人設定、顧客情報、会話履歴、認証情報は含みません。公開内容は
 `python tools/audit_public.py` で、作業ツリー・全Git ref・commit messageまで再検査できます。
 
+## Slackへ作業中の独り言を投稿する（任意）
+
+[Slack独り言ツール](tools/slack_soliloquy/README.md)で、Claude Code / Codexの作業中の判断を
+話題ごとのSlackスレッドへ共有できます。勤務先の認証・投稿先・勤務日時を各PCで設定します。
+既定は下書きのみで、自動投稿は明示的に有効化します。通常のセットアップでは導入しません。
+
 ## Codexの定額使用率を記録する（任意）
 
 [使用量モニター](tools/usage_monitor/README.md)を追加しています。Python 3.10以上とCodex CLIの既存ログインを使い、
@@ -132,13 +138,14 @@ python tools/audit_public.py
 - `skills/codex/`: Codex向けに手順が異なるスキルのoverride
 - [bootstrap.py](bootstrap.py): 標準ライブラリだけで動くinstall/check/smoke
 - [tools/audit_public.py](tools/audit_public.py): 公開payloadとGit履歴の監査
+- [tools/slack_soliloquy/](tools/slack_soliloquy/README.md): 勤務日時とプロジェクトで制限するSlack独り言投稿（任意）
 - [tools/usage_monitor/](tools/usage_monitor/README.md): Codexの定額使用率の記録とグラフ生成（任意）
 
 入らないもの:
 
 - 個人・顧客・案件のknowledge、journal、対話レビュー
 - トークン、cookie、資格情報、通常のClaude/Codex profile
-- Slack、Keychain、会社アカウントなど個人環境への連携
+- 個人・勤務先のSlackトークン、チャンネル台帳、勤務予定、会社アカウント設定
 - 自動push、会話原本の保存、常駐メニューバーなどprivate運用機能
 
 ## 更新と復旧
