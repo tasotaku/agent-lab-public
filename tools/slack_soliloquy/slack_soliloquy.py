@@ -207,7 +207,7 @@ def install(home: Path, agent: str, remove: bool = False) -> None:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['install', 'remove', 'configure', 'check', 'remind', 'draft', 'list', 'send', 'flush'])
-    parser.add_argument('--home', type=Path, default=Path.home())
+    parser.add_argument('--home', type=Path)
     parser.add_argument('--project', type=Path, default=Path.cwd())
     parser.add_argument('--agent', choices=['claude', 'codex'], default='codex')
     parser.add_argument('--channel')
@@ -216,7 +216,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument('--topic')
     parser.add_argument('--managed-id', default=MANAGED_ID)
     args = parser.parse_args(argv)
-    home = args.home.expanduser().resolve()
+    home = (args.home or Path.home()).expanduser().resolve()
     if args.action in ('install', 'remove'):
         install(home, args.agent, args.action == 'remove')
         return 0
