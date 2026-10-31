@@ -121,7 +121,7 @@ class SlackTests(unittest.TestCase):
 
     def test_missing_credential_fails_without_network(self):
         s.install(self.home, 'codex')
-        with patch.dict('os.environ', {}, clear=True), patch.object(s.sys, 'platform', 'linux'):
+        with patch.dict('os.environ', {'SLACK_SOLILOQUY_TOKEN': ''}), patch.object(s.sys, 'platform', 'linux'):
             with self.assertRaises(ValueError):
                 self.cli('check')
 
