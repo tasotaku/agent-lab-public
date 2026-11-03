@@ -118,6 +118,7 @@ def install_hooks(home: Path, agent: str) -> Path:
 def remove_hooks(home: Path, agent: str) -> Path:
     path = settings_path(home, agent)
     data = _read_json(path)
+    original = json.dumps(data)
     hooks = data.get("hooks")
     if isinstance(hooks, dict):
         for event in EVENTS:
@@ -127,7 +128,8 @@ def remove_hooks(home: Path, agent: str) -> Path:
                     hooks[event] = cleaned
                 else:
                     hooks.pop(event, None)
-    _write_json(path, data)
+    if json.dumps(data) != original:
+        _write_json(path, data)
     return path
 
 

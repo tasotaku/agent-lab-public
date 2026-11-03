@@ -168,6 +168,8 @@ def install(home: Path) -> int:
         results.append((f"Claude skill {name}", install_skill(source, home / ".claude/skills" / name, home, backup_root)))
     for name, source in codex.items():
         results.append((f"Codex skill {name}", install_skill(source, home / ".agents/skills" / name, home, backup_root)))
+    for agent in ("claude", "codex"):
+        session_memory.remove_hooks(home, agent)
     for label, status in results:
         print(f"{status}: {label}")
     print("MANUAL: sign in to Claude Code and Codex in each application when you use them")
@@ -250,17 +252,6 @@ def require_agent(agent: str | None) -> str:
     return agent
 
 
-def install_memory(home: Path, agent: str) -> int:
-    result = install(home)
-    if result:
-        return result
-    path = session_memory.install_hooks(home, agent)
-    print(f"PASS: local session memory installed for {agent}")
-    print(f"hooks: {path}")
-    print(f"NEXT: python bootstrap.py --home \"{home}\" check-memory --agent {agent} --project .")
-    return 0
-
-
 def remove_memory(home: Path, agent: str) -> int:
     path = session_memory.remove_hooks(home, agent)
     print(f"PASS: managed session memory hooks removed for {agent}")
@@ -302,7 +293,7 @@ def main() -> int:
         return smoke(home)
     agent = require_agent(args.agent)
     if args.command == "install-memory":
-        return install_memory(home, agent)
+        return remove_memory(home, agent)
     if args.command == "remove-memory":
         return remove_memory(home, agent)
     if args.command == "check-memory":

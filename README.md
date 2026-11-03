@@ -19,39 +19,13 @@ macOS・Windowsで1分ごとに使用率をCSVへ記録し、約10分の増加�
 AIの会話は開始しません。記録・認証情報は各PCへ残り、公開リポジトリには入りません。
 閾値による警告・AI実行停止は未実装です。通常のセットアップとは独立して、明示的に導入します。
 
-## セッションの判断経緯をローカルに残す（任意）
+## セッション自動記録フックの廃止
 
-この公開版には、セッション終了時に「完了したこと」「判断と理由」「次の作業」を
-project別のjournal/currentへ整理し、次回開始時に同じprojectへ再注入する仕組みもあります。
-会話原本は保存せず、明記されていない判断を推測しません。通信、外部同期、自動pushは行いません。
+更新後に `python bootstrap.py install` を実行すると、公開版が登録した Claude Code と Codex の記録・再注入フックだけを解除します。作成済みの journal/current と他のフックは保持します。`remove-memory --agent claude` または `remove-memory --agent codex` でも解除できます。旧 `install-memory` は解除へ移行しました。`check-memory`、`memory-record`、`memory-context` は手動操作用に残しています。
 
-通常の `install` と独立したopt-inです。まず隔離homeと対象projectを指定して導入・確認します。
+## Codex のモデル混雑からの再試行
 
-```powershell
-python bootstrap.py --home "$PWD\sandbox-home" install-memory --agent claude
-python bootstrap.py --home "$PWD\sandbox-home" check-memory --agent claude --project "$PWD"
-```
-
-macOS/LinuxまたはCodexでは `python3` と `--agent codex` を使います。Claude Codeは
-`~/.claude/settings.json`、Codexは `~/.codex/hooks.json` の既存内容を保ったまま、管理対象の
-SessionEnd/SessionStart hookを各1個追加します。
-
-安全な合成eventで終了・開始処理だけを確認できます。`event.json` には `cwd`、一意な
-`session_id`、合成JSONLへの `transcript_path` を入れます。JSONLには例えば
-`fixture task complete`、`use local journal because fixture must not send externally`、
-`Next: verify start injection` の3行を別messageとして入れてください。
-
-```powershell
-python bootstrap.py --home "$PWD\sandbox-home" memory-record --agent claude --event event.json
-python bootstrap.py --home "$PWD\sandbox-home" memory-context --agent claude --event event.json
-python bootstrap.py --home "$PWD\sandbox-home" check-memory --agent claude --project "$PWD"
-python bootstrap.py --home "$PWD\sandbox-home" remove-memory --agent claude
-```
-
-各コマンドは生成したjournal/currentの絶対path、対象agent/project、hook数を表示します。
-同じsession eventを再投入してもentryは増えません。`remove-memory` はこの仕組みのhookだけを外し、
-作成済みjournal/currentは利用者データとして保持します。詳しい安全境界は
-[SESSION_MEMORY_CONTRACT.md](SESSION_MEMORY_CONTRACT.md) にあります。
+[再試行ツール](tools/capacity_resume/README.md)は、ローカル履歴に保存された容量不足による失敗を検知し、180秒後に同じチャットへ一度だけ「再開」を送ります。デスクトップが実際に利用している共有 App Server が必要で、通常のインストールでは無効です。
 
 ## 3分セットアップ（まず隔離して試す）
 

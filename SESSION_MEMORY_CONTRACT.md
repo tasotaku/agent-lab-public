@@ -1,5 +1,7 @@
 # Public session-memory contract
 
+> Historical contract. Automatic hooks have been retired. See the migration in the README.
+
 The public distribution may install an opt-in, local-only session-memory mechanism.
 Its purpose is to preserve a short project history across Claude Code and Codex
 sessions without publishing or synchronizing the user's conversations.

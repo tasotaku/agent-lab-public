@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -61,7 +63,11 @@ class SessionMemoryTest(unittest.TestCase):
                 self.assertIn("user-tool", json.dumps(installed))
                 project, _, event = self.fixture(root)
                 paths = session_memory.record(home, agent, event)
-                session_memory.remove_hooks(home, agent)
+                subprocess.run(
+                    [sys.executable, str(Path(__file__).resolve().parents[1] / "bootstrap.py"),
+                     "--home", str(home), "install"],
+                    check=True, capture_output=True,
+                )
                 removed = json.loads(path.read_text(encoding="utf-8"))
                 self.assertNotIn(session_memory.MANAGED_ID, json.dumps(removed))
                 self.assertIn("user-tool", json.dumps(removed))

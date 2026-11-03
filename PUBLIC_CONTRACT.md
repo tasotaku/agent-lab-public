@@ -9,7 +9,7 @@ The public release must provide:
 - opinionated but generic rules;
 - reusable Claude Code and Codex skills;
 - a standard-library-only installer with `install`, `check`, and `smoke`;
-- an opt-in, standard-library-only session-memory mechanism that stores derived notes locally;
+- manual, standard-library-only session-memory commands and migration of retired managed hooks;
 - Windows, macOS, and Linux CI on the same commit;
 - a reproducible audit that scans the working tree and every Git ref;
 - a new public Git history containing only reviewed public files.
